@@ -8,6 +8,7 @@ import time
 from umi_log import logger
 from .page import Page  # 页基类
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
+from ..mission.mission_ocr_comparison import MissionOCRComparison  # 多引擎对比管理器
 from ..utils.utils import allowedFileName
 from ..ocr.output import Output  # 输出器
 
@@ -18,32 +19,62 @@ class BatchOCR(Page):
         self.argd = None
         self.msnID = ""
         self.outputList = []  # 输出器列表
+        self.comparison_mode = False  # 是否开启多引擎对比模式
+        self.comparison_results = {}  # 多引擎对比结果
 
     # ========================= 【qml调用python】 =========================
 
     def msnPaths(self, paths, argd):  # 接收路径列表和配置参数字典，开始OCR任务
-        # 任务信息
-        msnInfo = {
-            "onStart": self._onStart,
-            "onReady": self._onReady,
-            "onGet": self._onGet,
-            "onEnd": self._onEnd,
-            "argd": argd,
-        }
+        # 检查是否开启多引擎对比模式
+        self.comparison_mode = argd.get("mission.comparisonMode", False)
+        if self.comparison_mode:
+            # 多引擎对比模式
+            return self._msnPathsComparison(paths, argd)
+        else:
+            # 普通模式
+            # 任务信息
+            msnInfo = {
+                "onStart": self._onStart,
+                "onReady": self._onReady,
+                "onGet": self._onGet,
+                "onEnd": self._onEnd,
+                "argd": argd,
+            }
+            # 预处理参数字典
+            if not self._preprocessArgd(argd, paths[0]):
+                return ""
+            # 构造输出器
+            if not self._initOutputList(argd):
+                return ""
+            # 路径转为任务列表格式，加载进任务管理器
+            msnList = [{"path": x} for x in paths]
+            self.msnID = MissionOCR.addMissionList(msnInfo, msnList)
+            if self.msnID.startswith("[Error]"):  # 添加任务失败
+                self._onEnd(None, f"{self.msnID}\n添加任务失败。")
+            else:  # 添加成功，通知前端刷新UI
+                logger.debug(f"添加任务成功 {self.msnID}")
+            return self.msnID
+
+    def _msnPathsComparison(self, paths, argd):
+        """多引擎对比模式下的任务处理"""
         # 预处理参数字典
         if not self._preprocessArgd(argd, paths[0]):
             return ""
-        # 构造输出器
-        if not self._initOutputList(argd):
-            return ""
-        # 路径转为任务列表格式，加载进任务管理器
-        msnList = [{"path": x} for x in paths]
-        self.msnID = MissionOCR.addMissionList(msnInfo, msnList)
-        if self.msnID.startswith("[Error]"):  # 添加任务失败
-            self._onEnd(None, f"{self.msnID}\n添加任务失败。")
-        else:  # 添加成功，通知前端刷新UI
-            logger.debug(f"添加任务成功 {self.msnID}")
-        return self.msnID
+
+        # 运行多引擎对比
+        self.comparison_results = {}
+        for path in paths:
+            img_data = {"path": path}
+            result = MissionOCRComparison.run_comparison(img_data, argd)
+            self.comparison_results[path] = result
+
+            # 通知前端更新UI
+            self.callQmlInMain("onOcrComparisonGet", path, result)
+
+        # 通知前端任务完成
+        self.callQmlInMain("onOcrComparisonEnd", self.comparison_results)
+
+        return "comparison_mode"
 
     def _preprocessArgd(self, argd, path0):  # 预处理参数字典，无异常返回True
         self.argd = None
