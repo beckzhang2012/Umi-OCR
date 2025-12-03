@@ -12,7 +12,7 @@ id = CallFunc.delay(func, 3) # 延时调用
 # CallFunc.delayStop(id) # 取消延时调用
 """
 
-from PySide2.QtCore import QObject, Slot, Signal, QTimer, QMutex
+from PySide6.QtCore import QObject, Slot, Signal, QTimer, QMutex
 from uuid import uuid4  # 唯一ID
 
 

@@ -1,7 +1,7 @@
 # UI语言设置
 
 import os
-from PySide2.QtCore import QTranslator
+from PySide6.QtCore import QTranslator
 
 from . import pre_configs
 from plugin_i18n import setLangCode

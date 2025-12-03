@@ -3,7 +3,7 @@
 # =============================================
 
 
-from PySide2.QtCore import QMutex
+from PySide6.QtCore import QMutex
 from ..utils.thread_pool import threadRun  # 异步执行函数
 
 

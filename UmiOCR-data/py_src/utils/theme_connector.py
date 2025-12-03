@@ -2,7 +2,7 @@
 # =============== 主题连接器 ===============
 # =========================================
 
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from umi_log import logger
 

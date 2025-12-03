@@ -6,7 +6,7 @@
 import re
 import os
 import time
-from PySide2.QtQml import QJSValue
+from PySide6.QtQml import QJSValue
 from typing import List
 
 from ..event_bus.pubsub_service import PubSubService  # 发布事件

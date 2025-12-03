@@ -207,7 +207,7 @@ logger = _LogManager.create_logger("Umi-OCR")
 # 获取 QT 日志重定向器
 def get_qt_message_handler():
     # 确保在初次调用时才导入QT模块
-    from PySide2.QtCore import QtMsgType, QMessageLogContext
+    from PySide6.QtCore import QtMsgType, QMessageLogContext
 
     # 处理 QT (QML) 抛出的日志
     def qt_message_handler(mode: QtMsgType, context: QMessageLogContext, msg: str):

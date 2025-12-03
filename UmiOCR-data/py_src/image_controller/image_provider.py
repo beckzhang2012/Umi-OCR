@@ -5,9 +5,9 @@
 import os
 from uuid import uuid4  # 唯一ID
 from urllib.parse import unquote
-from PySide2.QtCore import Qt, QByteArray, QBuffer
-from PySide2.QtGui import QPixmap, QImage, QPainter, QClipboard
-from PySide2.QtQuick import QQuickImageProvider
+from PySide6.QtCore import Qt, QByteArray, QBuffer
+from PySide6.QtGui import QPixmap, QImage, QPainter, QClipboard
+from PySide6.QtQuick import QQuickImageProvider
 
 from umi_log import logger
 from . import ImageQt
