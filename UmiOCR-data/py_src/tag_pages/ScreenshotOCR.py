@@ -8,6 +8,7 @@ from umi_log import logger
 from .page import Page  # 页基类
 from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
+from ..mission.mission_ocr_comparison import MissionOCRComparison  # 多引擎对比管理器
 from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
 
 # 只要触发了截图/粘贴/图片识图任务，并结束任务（无论是否成功），都发送 <<ScreenshotOcrEnd>> 事件。
@@ -20,6 +21,8 @@ class ScreenshotOCR(Page):
         super().__init__(*args)
         self.msnDict = {}
         self.recentResult = []  # 缓存本轮任务的识别结果，提交给 <<ScreenshotOcrEnd>>
+        self.comparison_mode = False  # 是否开启多引擎对比模式
+        self.comparison_results = {}  # 多引擎对比结果
 
     # ========================= 【qml调用python】 =========================
 
@@ -34,16 +37,70 @@ class ScreenshotOCR(Page):
                 "<<ScreenshotOcrEnd>>", [{"code": 301, "data": imgID}]
             )
             return
-        pixmap = PixmapProvider.getPixmap(imgID)
-        if not pixmap:
-            logger.error(f'ScreenshotOCR: imgID "{imgID}" 不存在 PixmapProvider 中')
-            return
-        self._msnImage(pixmap, imgID, configDict)  # 开始OCR
+
+        # 检查是否开启多引擎对比模式
+        self.comparison_mode = configDict.get("mission.comparisonMode", False)
+        if self.comparison_mode:
+            # 多引擎对比模式
+            pixmap = PixmapProvider.getPixmap(imgID)
+            if not pixmap:
+                logger.error(f'ScreenshotOCR: imgID "{imgID}" 不存在 PixmapProvider 中')
+                return
+            self._msnImageComparison(pixmap, imgID, configDict)
+        else:
+            # 普通模式
+            pixmap = PixmapProvider.getPixmap(imgID)
+            if not pixmap:
+                logger.error(f'ScreenshotOCR: imgID "{imgID}" 不存在 PixmapProvider 中')
+                return
+            self._msnImage(pixmap, imgID, configDict)  # 开始OCR
 
     # 对一批路径进行OCR
     def ocrPaths(self, paths, configDict):
         self.recentResult = []
-        self._msnPaths(paths, configDict)
+        # 检查是否开启多引擎对比模式
+        self.comparison_mode = configDict.get("mission.comparisonMode", False)
+        if self.comparison_mode:
+            # 多引擎对比模式
+            self._msnPathsComparison(paths, configDict)
+        else:
+            # 普通模式
+            self._msnPaths(paths, configDict)
+
+    def _msnImageComparison(self, img, imgID, configDict):
+        """多引擎对比模式下的图片OCR处理"""
+        # 图片转字节
+        bytesData = PixmapProvider.toBytes(img)
+        img_data = {"bytes": bytesData}
+
+        # 运行多引擎对比
+        result = MissionOCRComparison.run_comparison(img_data, configDict)
+        self.comparison_results[imgID] = result
+
+        # 通知前端更新UI
+        self.callQmlInMain("onOcrComparisonGet", imgID, result)
+        self.callQmlInMain("onOcrComparisonEnd", self.comparison_results)
+
+        # 发布事件
+        PubSubService.publish("<<ScreenshotOcrEnd>>", [result])
+
+    def _msnPathsComparison(self, paths, configDict):
+        """多引擎对比模式下的路径OCR处理"""
+        # 运行多引擎对比
+        self.comparison_results = {}
+        for path in paths:
+            img_data = {"path": path}
+            result = MissionOCRComparison.run_comparison(img_data, configDict)
+            self.comparison_results[path] = result
+
+            # 通知前端更新UI
+            self.callQmlInMain("onOcrComparisonGet", path, result)
+
+        # 通知前端任务完成
+        self.callQmlInMain("onOcrComparisonEnd", self.comparison_results)
+
+        # 发布事件
+        PubSubService.publish("<<ScreenshotOcrEnd>>", list(self.comparison_results.values()))
 
     # 停止全部任务
     def msnStop(self):
