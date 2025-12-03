@@ -51,6 +51,12 @@ Item {
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")
         },
         {
+            key: "ShortcutSettings",
+            needController: true,
+            title: qsTr("快捷键设置"),
+            intro: qsTr("# 快捷键设置\n\n查看、修改、管理所有快捷键。")
+        },
+        {
             key: "About",
             title: qsTr("关于"),
             intro: qsTr("# 关于")

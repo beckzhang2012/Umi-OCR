@@ -16,10 +16,11 @@ from .BatchOCR import BatchOCR
 from .BatchDOC import BatchDOC
 from .ScreenshotOCR import ScreenshotOCR
 from .QRCode import QRCode
+from .ShortcutSettings import ShortcutSettings
 from ..utils.call_func import CallFunc
 
 # 控制器类列表
-PageClass = [BatchOCR, ScreenshotOCR, QRCode, BatchDOC]
+PageClass = [BatchOCR, ScreenshotOCR, QRCode, BatchDOC, ShortcutSettings]
 
 
 TagPageConnObj = None  # 记录实例
