@@ -105,6 +105,21 @@ Configs {
                     "toolTip": qsTr("每行为一条json数据，便于第三方程序读取操作"),
                     "default": false,
                 },
+                "html": {
+                    "title": qsTr("html 网页格式"),
+                    "toolTip": qsTr("生成HTML网页，支持图片预览、文字高亮、保留排版样式"),
+                    "default": false,
+                },
+                "mdTable": {
+                    "title": qsTr("md 表格格式"),
+                    "toolTip": qsTr("自动检测识别结果中的表格结构并转换为Markdown表格"),
+                    "default": false,
+                },
+                "excel": {
+                    "title": qsTr("excel 表格文件"),
+                    "toolTip": qsTr("生成Excel文件(.xlsx)，每张图片的识别结果占一行，包含详细信息"),
+                    "default": false,
+                },
             },
 
             "ignoreBlank": {
