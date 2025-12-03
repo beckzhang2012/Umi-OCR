@@ -4,12 +4,14 @@
 
 import os
 import time
+import uuid
 
 from umi_log import logger
 from .page import Page  # 页基类
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..utils.utils import allowedFileName
 from ..ocr.output import Output  # 输出器
+from ..utils.template_manager import TemplateManager
 
 
 class BatchOCR(Page):
@@ -18,6 +20,7 @@ class BatchOCR(Page):
         self.argd = None
         self.msnID = ""
         self.outputList = []  # 输出器列表
+        self.template_manager = TemplateManager("BatchOCR")
 
     # ========================= 【qml调用python】 =========================
 
@@ -178,3 +181,33 @@ class BatchOCR(Page):
 
     def _onPreview(self, msnInfo, msn, res):
         self.callQmlInMain("onPreview", msn["path"], res)
+
+    # ========================= 【模板管理接口】 =========================
+
+    def get_all_templates(self):
+        """获取所有模板"""
+        return self.template_manager.get_all_templates()
+
+    def search_templates(self, keyword):
+        """搜索模板"""
+        return self.template_manager.search_templates(keyword)
+
+    def get_template(self, template_id):
+        """获取模板详情"""
+        return self.template_manager.get_template(template_id)
+
+    def save_template(self, name, description, config):
+        """保存新模板"""
+        template_id = str(uuid.uuid4())
+        success, msg = self.template_manager.add_template(template_id, name, description, config)
+        return {"success": success, "msg": msg, "template_id": template_id}
+
+    def update_template(self, template_id, name=None, description=None, config=None):
+        """更新模板"""
+        success, msg = self.template_manager.update_template(template_id, name, description, config)
+        return {"success": success, "msg": msg}
+
+    def delete_template(self, template_id):
+        """删除模板"""
+        success, msg = self.template_manager.delete_template(template_id)
+        return {"success": success, "msg": msg}
