@@ -9,7 +9,214 @@ Configs {
     category_: "BatchOCR"
     signal clickIgnoreArea() // 打开忽略区域
 
+    // 模板管理
+    property var templates: []
+    property string searchKeyword: ""
+
+    // 初始化加载模板
+    Component.onCompleted: {
+        loadTemplates()
+    }
+
+    // 加载所有模板
+    function loadTemplates() {
+        templates = tabPage.callPy("get_all_templates")
+    }
+
+    // 搜索模板
+    function searchTemplates() {
+        if(!searchKeyword.trim()) {
+            loadTemplates()
+            return
+        }
+        const result = tabPage.callPy("search_templates", searchKeyword.trim())
+        if(result.success) {
+            templates = result.data
+        } else {
+            templates = []
+        }
+    }
+
+    // 保存为模板
+    function saveAsTemplate() {
+        let dlg = Dialog_ {
+            title: qsTr("保存为模板"),
+            width: 400,
+            height: 220,
+            
+            contentItem: Column {
+                spacing: size_.spacing
+                padding: size_.spacing
+                
+                TextField {
+                    id: templateNameInput
+                    width: parent.width
+                    placeholderText: qsTr("模板名称")
+                    focus: true
+                }
+                
+                TextArea {
+                    id: templateDescInput
+                    width: parent.width
+                    height: 80
+                    placeholderText: qsTr("模板描述（可选）")
+                }
+            },
+            
+            btnsList: [
+                {"text":qsTr("取消")},
+                {
+                    "text":qsTr("保存"),
+                    "onClicked": function() {
+                        const templateName = templateNameInput.text.trim()
+                        if (!templateName) {
+                            qmlapp.popup.message(qsTr("提示"), qsTr("请输入模板名称"), "warning")
+                            return
+                        }
+                        const config = getValueDict()
+                        const result = tabPage.callPy("save_template", templateName, templateDescInput.text.trim() || "", config)
+                        if(result.success) {
+                            qmlapp.popup.simple(qsTr("模板保存成功"), result.msg)
+                            loadTemplates()
+                        } else {
+                            qmlapp.popup.message(qsTr("保存失败"), result.msg, "error")
+                        }
+                        dlg.close()
+                    }
+                }
+            ]
+        }
+        dlg.open()
+    }
+
+    // 加载模板
+    function loadTemplate(template) {
+        // 填充所有配置项
+        for(let key in template.config) {
+            setValue(key, template.config[key], true)
+        }
+        qmlapp.popup.simple(qsTr("模板加载成功"), qsTr("已应用模板: ") + template.name)
+    }
+
+    // 删除模板
+    function deleteTemplate(template) {
+        qmlapp.popup.dialog(qsTr("确认删除"), qsTr("确定要删除模板 '%1' 吗?").arg(template.name), function(flag) {
+            if(flag) {
+                const result = tabPage.callPy("delete_template", template.id)
+                if(result.success) {
+                    qmlapp.popup.simple(qsTr("删除成功"), result.msg)
+                    loadTemplates()
+                } else {
+                    qmlapp.popup.message(qsTr("删除失败"), result.msg, "error")
+                }
+            }
+        }, "warning")
+    }
+
     configDict: {
+        // 模板管理
+        "templates": {
+            "title": qsTr("模板管理"),
+            "type": "group",
+            "enabledFold": false,
+            
+            "saveBtn": {
+                "title": qsTr("保存为模板"),
+                "btnsList": [
+                    {"text":qsTr("保存模板"), "onClicked": saveAsTemplate},
+                ],
+            },
+            
+            "search": {
+                "title": qsTr("搜索模板"),
+                "type": "text",
+                "default": "",
+                "onChanged": function(val) {
+                    searchKeyword = val
+                    Qt.callLater(searchTemplates)
+                }
+            },
+            
+            "templateList": {
+                "title": qsTr("模板列表"),
+                "type": "custom",
+                "component": Component {
+                    Item {
+                        anchors.fill: parent
+                        
+                        ListView {
+                            id: templateListView
+                            anchors.fill: parent
+                            anchors.margins: size_.smallSpacing
+                            model: templates
+                            
+                            delegate: Item {
+                                width: parent.width
+                                height: size_.line * 3.5
+                                
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: size_.smallSpacing
+                                    spacing: size_.smallSpacing
+                                    
+                                    Text {
+                                        text: modelData.name
+                                        font.bold: true
+                                        color: theme.textColor
+                                        elide: Text.ElideRight
+                                    }
+                                    
+                                    Text {
+                                        text: modelData.description
+                                        color: theme.textSecondaryColor
+                                        font.pixelSize: theme.fontSizeSmall
+                                        elide: Text.ElideRight
+                                        height: size_.line
+                                    }
+                                    
+                                    Row {
+                                        spacing: size_.smallSpacing
+                                        
+                                        Button_ {
+                                            text: qsTr("加载")
+                                            onClicked: loadTemplate(modelData)
+                                        }
+                                        
+                                        Button_ {
+                                            text: qsTr("删除")
+                                            color: "#ff6b6b"
+                                            onClicked: deleteTemplate(modelData)
+                                        }
+                                    }
+                                }
+                                
+                                Rectangle {
+                                    anchors.bottom: parent.bottom
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    height: 1
+                                    color: theme.borderColor
+                                }
+                            }
+                            
+                            ScrollBar.vertical: ScrollBar {}
+                            
+                            header: Item {
+                                height: size_.line
+                                visible: templates.length === 0
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: qsTr("暂无模板，请先创建")
+                                    color: theme.textSecondaryColor
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        
         // OCR参数
         "ocr": qmlapp.globalConfigs.ocrManager.deploy(this, "ocr"), 
 
