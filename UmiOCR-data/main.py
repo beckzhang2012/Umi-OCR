@@ -115,9 +115,9 @@ def initRuntimeEnvironment():
         if os.path.exists(path):
             site.addsitedir(path)
     # 初始化Qt搜索路径为相对路径，避免上层目录存在中文编码
-    from PySide2.QtCore import QCoreApplication
+    from PySide6.QtCore import QCoreApplication
 
-    QCoreApplication.addLibraryPath("./site-packages/PySide2/plugins")
+    QCoreApplication.addLibraryPath("./site-packages/PySide6/plugins")
 
 
 if __name__ == "__main__":

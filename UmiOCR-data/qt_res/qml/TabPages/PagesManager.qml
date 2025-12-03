@@ -55,6 +55,11 @@ Item {
             title: qsTr("关于"),
             intro: qsTr("# 关于")
         },
+        {
+            key: "HotkeyManager",
+            title: qsTr("快捷键设置"),
+            intro: qsTr("# 快捷键设置\n\n查看、修改和管理所有快捷键配置。")
+        },
     ]
 
     /* 存放当前已打开的页面

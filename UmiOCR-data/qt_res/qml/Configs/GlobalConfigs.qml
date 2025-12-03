@@ -237,6 +237,59 @@ Configs {
             },
         },
 
+        // 快捷键
+        "hotkeys": {
+            "title": qsTr("快捷键"),
+            "type": "group",
+            "type": "var",
+            "default": {
+                "screenshot_ocr": {
+                    "key": "Ctrl+Shift+A",
+                    "description": qsTr("截图OCR"),
+                    "module": qsTr("截图相关"),
+                    "defaultKey": "Ctrl+Shift+A"
+                },
+                "batch_ocr": {
+                    "key": "Ctrl+Shift+B",
+                    "description": qsTr("批量OCR"),
+                    "module": qsTr("批量相关"),
+                    "defaultKey": "Ctrl+Shift+B"
+                },
+                "quick_ocr": {
+                    "key": "Ctrl+Shift+Q",
+                    "description": qsTr("快速OCR"),
+                    "module": qsTr("全局设置"),
+                    "defaultKey": "Ctrl+Shift+Q"
+                },
+                "minimize_window": {
+                    "key": "Ctrl+M",
+                    "description": qsTr("最小化窗口"),
+                    "module": qsTr("窗口操作"),
+                    "defaultKey": "Ctrl+M"
+                },
+                "exit_app": {
+                    "key": "Alt+F4",
+                    "description": qsTr("退出应用"),
+                    "module": qsTr("窗口操作"),
+                    "defaultKey": "Alt+F4"
+                },
+                "open_settings": {
+                    "key": "Ctrl+,",
+                    "description": qsTr("打开设置"),
+                    "module": qsTr("全局设置"),
+                    "defaultKey": "Ctrl+,"
+                }
+            },
+            "onChanged": (newHotkeys, oldHotkeys)=>{
+                if(oldHotkeys !== undefined) {
+                    // 当快捷键配置变更时，通知KeyMouseConnector更新绑定
+                    if(qmlapp.keyMouseConnector) {
+                        qmlapp.keyMouseConnector.updateHotkeys(newHotkeys)
+                    }
+                }
+            },
+        },
+
         // 日志
         "logs": {
             "title": qsTr("日志"),
