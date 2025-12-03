@@ -1,99 +1,86 @@
-# 任务队列类
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-from uuid import uuid4
-from typing import Callable, Any
+"""
+Umi-OCR 任务队列模块
+"""
 
-from umi_log import logger
+import sys
+import os
+from PySide6.QtCore import QObject, Signal
+from typing import List, Dict, Callable
+
+from .mission import Mission
 
 
-class MissionQueue:
-    def __init__(
-        self,
-        msnList: list,  # 任务内容列表，每项为一个任务元素
-        configs: dict = {},  # 任务控制参数
-        # 回调函数
-        # 整个队列 即将启动。回调参数(self)
-        onStart: Callable[["MissionQueue"], None] = None,
-        # 单个任务 准备进行。回调参数(self, 任务元素)
-        onReady: Callable[["MissionQueue", Any], None] = None,
-        # 单个任务 完成。回调参数(self, 任务元素, 任务结果)
-        onGet: Callable[["MissionQueue"], None] = None,
-        # 整个队列 已结束。回调参数(self, 结果标志)
-        # 结果标志："[Success]...", "[Warning]...", "[Error]..."
-        onEnd: Callable[["MissionQueue", str], None] = None,
-    ):
-        self.msnList = msnList
-        self.configs = configs
-        self.id = str(uuid4())  # 任务ID
-        self.len = len(msnList)  # 队列总长度
-        self.index = 0  # 当前任务下标
-        self._onStart = onStart if onStart else self._pass
-        self._onReady = onReady if onReady else self._pass
-        self._onGet = onGet if onGet else self._pass
-        self._onEnd = onEnd if onEnd else self._pass
-        # 工作状态： "waiting" "running"
-        self.state_work = "waiting"
-        # 控制状态： "" "pause" "stop"
-        self.state_ctrl = ""
-
-    # ==================== mission调用 ====================
-
-    # 获取剩余任务长度
-    def remainingLen(self):
-        return self.len - self.index
-
-    # 判空 【1】←在一轮任务循环中的调用顺序
-    def empty(self):
-        return self.index >= self.len
-
-    # 获取一个任务元素 【2】
-    def getMsn(self):
-        return self.msnList[self.index]
-
-    # 完成一个任务元素 【5】
-    def popMsn(self):
-        self.index += 1
-
-    # 恢复进行
-    def resume(self):
-        if self.state_ctrl == "pause":
-            self.state_ctrl = ""
-
-    # 暂停
-    def pause(self):
-        self.state_ctrl = "pause"
-
-    # 停止（废弃）
-    def stop(self):
-        self.state_ctrl = "stop"
-
-    # ==================== 回调函数 ====================
-
-    def onStart(self):
-        try:
-            self._onStart(self)
-        except Exception:
-            logger.error("任务 onStart 回调异常。", exc_info=True, stack_info=True)
-
-    def onReady(self):  # 【3】
-        try:
-            self._onReady(self)
-        except Exception:
-            logger.error("任务 onReady 回调异常。", exc_info=True, stack_info=True)
-
-    def onGet(self, res):  # 【4】
-        try:
-            self._onGet(self, res)
-        except Exception:
-            logger.error("任务 onGet 回调异常。", exc_info=True, stack_info=True)
-
-    def onEnd(self, flag):
-        # 结果标志："[Success]...", "[Warning]...", "[Error]..."
-        try:
-            self._onEnd(self, flag)
-        except Exception:
-            logger.error("任务 onEnd 回调异常。", exc_info=True, stack_info=True)
-
-    @staticmethod
-    def _pass(*e):  # 空函数
-        pass
+class MissionQueue(QObject):
+    """任务队列类，用于管理任务的添加、移除和查询"""
+    
+    # 定义信号
+    mission_added = Signal(Mission)  # 任务添加信号
+    mission_removed = Signal(Mission)  # 任务移除信号
+    
+    def __init__(self):
+        super().__init__()
+        
+        self.missions = []  # 任务列表
+    
+    def add_mission(self, mission: Mission):
+        """添加任务"""
+        if mission not in self.missions:
+            self.missions.append(mission)
+            self.mission_added.emit(mission)
+    
+    def remove_mission(self, mission: Mission):
+        """移除任务"""
+        if mission in self.missions:
+            self.missions.remove(mission)
+            self.mission_removed.emit(mission)
+    
+    def get_missions(self) -> List[Mission]:
+        """获取所有任务"""
+        return self.missions
+    
+    def get_mission_by_id(self, mission_id: str) -> Mission:
+        """通过ID获取任务"""
+        for mission in self.missions:
+            if mission.get_mission_id() == mission_id:
+                return mission
+        return None
+    
+    def get_missions_by_type(self, mission_type: str) -> List[Mission]:
+        """通过类型获取任务列表"""
+        return [mission for mission in self.missions if mission.get_mission_type() == mission_type]
+    
+    def get_running_missions(self) -> List[Mission]:
+        """获取正在运行的任务列表"""
+        return [mission for mission in self.missions if mission.is_running()]
+    
+    def get_completed_missions(self) -> List[Mission]:
+        """获取已完成的任务列表"""
+        return [mission for mission in self.missions if mission.is_completed()]
+    
+    def get_failed_missions(self) -> List[Mission]:
+        """获取失败的任务列表"""
+        return [mission for mission in self.missions if mission.is_failed()]
+    
+    def clear_missions(self):
+        """清除所有任务"""
+        for mission in self.missions:
+            self.remove_mission(mission)
+    
+    def get_mission_count(self) -> int:
+        """获取任务总数"""
+        return len(self.missions)
+    
+    def get_running_mission_count(self) -> int:
+        """获取正在运行的任务数"""
+        return len(self.get_running_missions())
+    
+    def get_completed_mission_count(self) -> int:
+        """获取已完成的任务数"""
+        return len(self.get_completed_missions())
+    
+    def get_failed_mission_count(self) -> int:
+        """获取失败的任务数"""
+        return len(self.get_failed_missions())

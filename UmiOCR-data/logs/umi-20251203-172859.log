@@ -1,0 +1,15 @@
+2025-12-03 17:28:59,576 - py_src.imports.umi_log - INFO - UmiLogger initialized for py_src.imports.umi_log
+2025-12-03 17:28:59,577 - py_src.imports.umi_log - CRITICAL - Failed to startup main program!
+Traceback (most recent call last):
+  File "D:\beck\work\test\buzzer\A\Umi-OCR\UmiOCR-data\main.py", line 142, in <module>
+    from py_src.run import main
+  File "D:\beck\work\test\buzzer\A\Umi-OCR\UmiOCR-data\py_src\run.py", line 27, in <module>
+    from ocr.ocr_manager import OCRManager
+  File "D:\beck\work\test\buzzer\A\Umi-OCR\UmiOCR-data\py_src\ocr\ocr_manager.py", line 13, in <module>
+    from .api import OCR_API
+  File "D:\beck\work\test\buzzer\A\Umi-OCR\UmiOCR-data\py_src\ocr\api\__init__.py", line 1
+    return {}
+IndentationError: unexpected indent
+Stack (most recent call last):
+  File "D:\beck\work\test\buzzer\A\Umi-OCR\UmiOCR-data\main.py", line 149, in <module>
+    logger.critical(

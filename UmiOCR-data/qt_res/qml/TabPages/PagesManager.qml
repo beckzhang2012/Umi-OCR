@@ -46,6 +46,12 @@ Item {
                 + " `Aztec, Codabar, Code128, Code39, Code93, DataBar, DataBarExpanded, DataMatrix, EAN13, EAN8, ITF, LinearCodes, MatrixCodes, MaxiCode, MicroQRCode, PDF417, QRCode, UPCA, UPCE`",
         },
         {
+            key: "Statistics",
+            needController: true,
+            title: qsTr("统计"),
+            intro: qsTr("# 统计\n\n查看OCR识别的统计数据，包括识别次数、成功率、常用词汇等。")
+        },
+        {
             key: "GlobalConfigsPage",
             title: qsTr("全局设置"),
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")

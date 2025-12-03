@@ -1,104 +1,106 @@
-# ========================================
-# =============== 截图控制 ===============
-# ========================================
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-from ..image_controller.image_provider import PixmapProvider  # 图片提供器
-from ..utils.file_finder import findFiles
+"""
+Umi-OCR 截图控制器模块
+"""
 
-import time
-from PySide2.QtGui import QGuiApplication, QClipboard, QImage, QPixmap  # 截图 剪贴板
+import sys
+import os
+from PySide6.QtCore import QObject, Signal, Slot, QRect, QTimer
+from PySide6.QtGui import QImage, QPixmap, QGuiApplication, QScreen
 
-Clipboard = QClipboard()  # 剪贴板
 
-
-class _ScreenshotControllerClass:
-
-    def getScreenshot(self, wait=0):
-        """
-        延时wait秒后，获取所有屏幕的截图。返回列表(不为空)，每项为：\n
-        {
-            "imgID": 图片ID 或 报错信息 "[Error]开头" ,
-            "screenName": 显示器名称 ,
-            "width": 截图宽度 ,
-            "height": 截图高度 ,
-        }
-        """
-        if wait > 0:
-            time.sleep(wait)
-        try:
-            grabList = []
-            screensList = QGuiApplication.screens()
-            for screen in screensList:
-                name = screen.name()
-                # 获取截图
-                pixmap = screen.grabWindow(0)
-                width = pixmap.width()
-                height = pixmap.height()
-                # 检查截图失败
-                if width <= 0 or height <= 0:
-                    imgID = f"[Error] width={width}, height={height}"
-                # 检查有效，存入提供器，获取imgID
-                else:
-                    imgID = PixmapProvider.addPixmap(pixmap)
-                grabList.append(
-                    {
-                        "imgID": imgID,
-                        "screenName": name,
-                        "width": width,
-                        "height": height,
-                    }
-                )
-            if not grabList:  # 获取到的截图列表为空
-                return [{"imgID": f"[Error] grabList is empty."}]
-            return grabList
-        except Exception as e:
-            return [{"imgID": f"[Error] Screenshot: {e}"}]
-
-    # 对一张图片做裁切。传入原图imgID和裁切参数，返回裁切后的imgID或[Error]
-    def getClipImgID(self, imgID, x, y, w, h):
-        try:
-            pixmap = PixmapProvider.getPixmap(imgID)
-            if not pixmap:
-                return f'[Error] Screenshot: Key "{imgID}" does not exist in the PixmapProvider dict.'
-            if x < 0 or y < 0 or w <= 0 or h <= 0:
-                return f"[Error] Screenshot: x/y/w/h value error. {x}/{y}/{w}/{h}"
-            pixmap = pixmap.copy(x, y, w, h)  # 进行裁切
-            clipID = PixmapProvider.addPixmap(pixmap)  # 存入提供器，获取imgID
-            return clipID
-        except Exception as e:
-            return f"[Error] Screenshot: {e}"
-
-    # 获取当前剪贴板的内容
-    # type: imgID paths text
-    def getPaste(self):
-        # 获取剪贴板数据
-        mimeData = Clipboard.mimeData()
-        res = {"type": ""}  # 结果字典
-        # 检查剪贴板的内容，若是图片，则提取它并扔给OCR
-        if mimeData.hasImage():
-            image = Clipboard.image()
-            pixmap = QPixmap.fromImage(image)
-            pasteID = PixmapProvider.addPixmap(pixmap)  # 存入提供器
-            res = {"type": "imgID", "imgID": pasteID}
-        # 若为URL
-        elif mimeData.hasUrls():
-            urlList = mimeData.urls()
-            paths = []
-            for url in urlList:  # 遍历URL列表，提取其中的文件
-                if url.isLocalFile():
-                    p = url.toLocalFile()
-                    paths.append(p)
-            paths = findFiles(paths, "image", False)  # 过滤，保留图片的路径
-            if len(paths) == 0:  # 没有有效图片
-                res = {"type": "error", "error": "[Warning] No image in clipboard."}
-            else:  # 将有效图片地址传入OCR，返回地址列表
-                res = {"type": "paths", "paths": paths}
-        elif mimeData.hasText():
-            text = mimeData.text()
-            res = {"type": "text", "text": text}
+class _ScreenshotControllerClass(QObject):
+    """截图控制器类"""
+    
+    # 定义信号
+    screenshot_taken = Signal(QImage)  # 截图完成信号
+    screenshot_error = Signal(str)  # 截图错误信号
+    
+    def __init__(self):
+        super().__init__()
+        
+        self.screenshot_timer = QTimer()
+        self.screenshot_timer.setSingleShot(True)
+        self.screenshot_timer.timeout.connect(self._take_screenshot)
+    
+    def take_screenshot(self, delay: int = 0):
+        """截图"""
+        if delay > 0:
+            # 延迟截图
+            self.screenshot_timer.start(delay)
         else:
-            res = {"type": "error", "error": "[Warning] Unknow mimeData in clipboard."}
-        return res  # 返回结果字典
+            # 立即截图
+            self._take_screenshot()
+    
+    def _take_screenshot(self):
+        """执行截图"""
+        try:
+            # 获取当前屏幕
+            screen = QGuiApplication.primaryScreen()
+            
+            if screen is None:
+                raise Exception("Failed to get primary screen")
+            
+            # 截取整个屏幕
+            screenshot = screen.grabWindow(0)
+            
+            if screenshot.isNull():
+                raise Exception("Failed to take screenshot")
+            
+            # 转换为 QImage
+            image = screenshot.toImage()
+            
+            # 发送截图完成信号
+            self.screenshot_taken.emit(image)
+        
+        except Exception as e:
+            # 发送截图错误信号
+            self.screenshot_error.emit(str(e))
+    
+    def take_screenshot_of_region(self, region: QRect):
+        """截取指定区域的屏幕"""
+        try:
+            # 获取当前屏幕
+            screen = QGuiApplication.primaryScreen()
+            
+            if screen is None:
+                raise Exception("Failed to get primary screen")
+            
+            # 截取指定区域
+            screenshot = screen.grabWindow(0, region.x(), region.y(), region.width(), region.height())
+            
+            if screenshot.isNull():
+                raise Exception("Failed to take screenshot of region")
+            
+            # 转换为 QImage
+            image = screenshot.toImage()
+            
+            # 发送截图完成信号
+            self.screenshot_taken.emit(image)
+        
+        except Exception as e:
+            # 发送截图错误信号
+            self.screenshot_error.emit(str(e))
+    
+    def get_screen_size(self) -> QRect:
+        """获取屏幕大小"""
+        try:
+            # 获取当前屏幕
+            screen = QGuiApplication.primaryScreen()
+            
+            if screen is None:
+                raise Exception("Failed to get primary screen")
+            
+            # 获取屏幕大小
+            return screen.geometry()
+        
+        except Exception as e:
+            # 发送截图错误信号
+            self.screenshot_error.emit(str(e))
+            return QRect(0, 0, 0, 0)
 
 
+# 全局截图控制器实例
 ScreenshotController = _ScreenshotControllerClass()

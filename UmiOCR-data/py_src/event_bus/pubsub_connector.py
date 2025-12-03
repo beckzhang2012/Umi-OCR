@@ -1,57 +1,50 @@
-# ========================================================
-# =============== 发布/订阅连接器，在qml调用 ===============
-# ========================================================
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-from PySide2.QtCore import QObject, Slot
+"""
+Umi-OCR 发布订阅连接器模块
+"""
+
+import sys
+from PySide6.QtCore import QObject, Signal, Slot
 
 from .pubsub_service import PubSubService
-from umi_log import logger
 
 
 class PubSubConnector(QObject):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self._funcDict = {}  # 缓存历史已订阅的函数
-
-    # 订阅事件。传入 标题，函数所在Item，函数名
-    @Slot(str, "QVariant", str)
-    def subscribe(self, title, item, funcName):
-        func = getattr(item, funcName, None)
-        if not func:
-            logger.error(f"qml订阅事件失败！未在 {item} 中找到函数 {funcName} 。")
-            return
-        PubSubService.subscribe(title, func)
-        fKey = title + funcName
-        self._funcDict[fKey] = func
-
-    # 订阅事件，可额外传入组
-    @Slot(str, "QVariant", str, str)
-    def subscribeGroup(self, title, item, funcName, groupName):
-        func = getattr(item, funcName, None)
-        if not func:
-            logger.error(f"qml订阅事件失败！未在 {item} 中找到函数 {funcName} 。")
-            return
-        PubSubService.subscribeGroup(title, func, groupName)
-        fKey = title + funcName
-        self._funcDict[fKey] = func
-
-    # 取消订阅事件，由于getattr的不稳定性，因此从历史记录中取函数引用，而不是重新查询。
-    @Slot(str, "QVariant", str)
-    def unsubscribe(self, title, item, funcName):
-        fKey = title + funcName
-        if fKey not in self._funcDict:
-            logger.error(f"qml订阅事件失败！fKey {fKey} 未在 _funcDict 中。")
-            return
-        func = self._funcDict[fKey]
-        del self._funcDict[fKey]
-        PubSubService.unsubscribe(title, func)
-
-    # 取消订阅整个组的事件
-    @Slot(str)
-    def unsubscribeGroup(self, groupName):
-        PubSubService.unsubscribeGroup(groupName)
-
-    # 发布事件，在qml扩展此函数。传入 args 为参数列表。
-    @Slot(str, list)
-    def publish_(self, title, args):
-        PubSubService.publish(title, *args)
+    """发布订阅连接器类，用于连接事件总线和发布订阅服务"""
+    
+    # 定义信号
+    signal = Signal(str, object)  # 主题名称，主题数据
+    
+    def __init__(self):
+        super().__init__()
+        
+        # 连接信号和槽
+        self.signal.connect(self._on_signal)
+        
+        # 注册事件处理函数
+        self._register_event_handlers()
+    
+    def _register_event_handlers(self):
+        """注册事件处理函数"""
+        # 这里可以添加事件处理函数的注册逻辑
+        pass
+    
+    def publish(self, topic: str, topic_data: object = None):
+        """发布主题"""
+        self.signal.emit(topic, topic_data)
+    
+    @Slot(str, object)
+    def _on_signal(self, topic: str, topic_data: object = None):
+        """处理信号"""
+        # 发布主题到发布订阅服务
+        PubSubService.publish(topic, topic_data)
+    
+    def subscribe(self, topic: str, callback: callable):
+        """订阅主题"""
+        PubSubService.subscribe(topic, callback)
+    
+    def unsubscribe(self, topic: str, callback: callable):
+        """取消订阅主题"""
+        PubSubService.unsubscribe(topic, callback)
