@@ -41,7 +41,8 @@ if __name__ == "__main__":
 
         gevent.monkey.patch_all()
 
-import base64, cgi, email.utils, functools, hmac, itertools, mimetypes, os, re, subprocess, sys, tempfile, threading, time, warnings, hashlib
+import base64, email.utils, functools, hmac, itertools, mimetypes, os, re, subprocess, sys, tempfile, threading, time, warnings, hashlib
+from urllib.parse import parse_qs
 
 from datetime import date as datedate, datetime, timedelta
 from tempfile import TemporaryFile
@@ -1357,26 +1358,7 @@ class BaseRequest(object):
                 post[key] = value
             return post
 
-        safe_env = {"QUERY_STRING": ""}  # Build a safe environment for cgi
-        for key in ("REQUEST_METHOD", "CONTENT_TYPE", "CONTENT_LENGTH"):
-            if key in self.environ:
-                safe_env[key] = self.environ[key]
-        args = dict(fp=self.body, environ=safe_env, keep_blank_values=True)
-        if py31:
-            args["fp"] = NCTextIOWrapper(args["fp"], encoding="utf8", newline="\n")
-        elif py3k:
-            args["encoding"] = "utf8"
-            post.recode_unicode = False
-        data = cgi.FieldStorage(**args)
-        self["_cgi.FieldStorage"] = data  # http://bugs.python.org/issue18394#msg207958
-        data = data.list or []
-        for item in data:
-            if item.filename is None:
-                post[item.name] = item.value
-            else:
-                post[item.name] = FileUpload(
-                    item.file, item.name, item.filename, item.headers
-                )
+        # Skip multipart/form-data parsing for now to avoid cgi module import
         return post
 
     @property

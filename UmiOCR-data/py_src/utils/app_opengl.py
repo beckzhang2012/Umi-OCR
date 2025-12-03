@@ -1,7 +1,7 @@
 # 软件渲染选项
 
-from PySide2.QtGui import QGuiApplication, QOpenGLContext
-from PySide2.QtCore import Qt
+from PySide6.QtGui import QGuiApplication, QOpenGLContext
+from PySide6.QtCore import Qt
 import os
 
 from umi_log import logger
@@ -10,7 +10,6 @@ from ..platform import Platform
 
 _GLDict = {
     "AA_UseDesktopOpenGL": Qt.AA_UseDesktopOpenGL,
-    "AA_UseOpenGLES": Qt.AA_UseOpenGLES,
     "AA_UseSoftwareOpenGL": Qt.AA_UseSoftwareOpenGL,
 }
 _Opt = ""
@@ -28,13 +27,13 @@ def initOpengl():
 
 def checkOpengl():
     global _Opt
-    if _Opt == "AA_UseOpenGLES":  # GLES需要检查，有些win7不支持
-        if not QOpenGLContext.openGLModuleType() == QOpenGLContext.LibGLES:
-            QGuiApplication.setAttribute(Qt.AA_UseOpenGLES, False)
-            _Opt = "AA_UseSoftwareOpenGL"  # 既然不支持opengl，那就软渲染吧
+    if _Opt == "AA_UseDesktopOpenGL":  # 桌面OpenGL需要检查
+        if not QOpenGLContext.openGLModuleType() == QOpenGLContext.LibOpenGL:
+            QGuiApplication.setAttribute(Qt.AA_UseDesktopOpenGL, False)
+            _Opt = "AA_UseSoftwareOpenGL"  # 既然不支持桌面OpenGL，那就软渲染吧
             setOpengl(_Opt)
-            msg = "当前系统不支持OpenGLES，已禁用此渲染器。\n若本次运行中程序崩溃或报错，请重新启动程序。\n\n"
-            msg += "The current system does not support OpenGLES and has disabled the program from using this renderer. \nIf there are crashes or errors during this run, please restarting the program."
+            msg = "当前系统不支持桌面OpenGL，已禁用此渲染器。\n若本次运行中程序崩溃或报错，请重新启动程序。\n\n"
+            msg += "The current system does not support desktop OpenGL and has disabled the program from using this renderer. \nIf there are crashes or errors during this run, please restarting the program."
             logger.warning(msg)
             os.MessageBox(msg, type_="warning")
 

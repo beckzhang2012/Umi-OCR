@@ -3,7 +3,7 @@
 # ==============================================
 
 
-from PySide2.QtCore import QMutex, QRunnable
+from PySide6.QtCore import QMutex, QRunnable
 from threading import Condition
 from uuid import uuid4  # 唯一ID
 import time

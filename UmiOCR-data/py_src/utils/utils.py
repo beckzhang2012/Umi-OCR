@@ -4,14 +4,14 @@
 
 import re
 import os
-from PySide2.QtGui import QClipboard
-from PySide2.QtCore import QFileInfo
-from PySide2.QtQml import QJSValue
+from PySide6.QtGui import QClipboard, QGuiApplication
+from PySide6.QtCore import QFileInfo
+from PySide6.QtQml import QJSValue
 from urllib.parse import unquote  # 路径解码
 
 from umi_log import logger
 
-Clipboard = QClipboard()  # 剪贴板
+Clipboard = QGuiApplication.clipboard()  # 剪贴板
 
 
 # 传入文件名，检测是否含非法字符。没问题返回True

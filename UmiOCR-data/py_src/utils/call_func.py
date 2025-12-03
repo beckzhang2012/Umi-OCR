@@ -1,6 +1,6 @@
 # 提供在主线程中调用指定函数
 
-from PySide2.QtCore import QObject, Slot, Signal, QTimer, QMutex
+from PySide6.QtCore import QObject, Slot, Signal, QTimer, QMutex
 from uuid import uuid4  # 唯一ID
 
 

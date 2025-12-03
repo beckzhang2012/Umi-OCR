@@ -1,7 +1,7 @@
 # 全局设置连接器
 
 import os
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from . import app_opengl
 from .i18n_configs import I18n

@@ -47,9 +47,9 @@ import site
 # 启动主qml。工作路径必须为 UmiOCR-data
 def runQml(engineAddImportPath):
     # ==================== 0. 导入包 ====================
-    from PySide2.QtCore import Qt, qInstallMessageHandler
-    from PySide2.QtGui import QGuiApplication
-    from PySide2.QtQml import QQmlApplicationEngine, qmlRegisterType
+    from PySide6.QtCore import Qt, qInstallMessageHandler
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterType
 
     from umi_about import UmiAbout  # 项目信息
     from umi_log import get_qt_message_handler, logger  # 日志
@@ -90,6 +90,7 @@ def runQml(engineAddImportPath):
     from .image_controller.image_connector import ImageConnector  # 图片处理连接器
     from .image_controller.image_provider import PixmapProvider  # 图片提供器
     from .utils.i18n_configs import I18n  # 语言
+    from .utils.mission_multi_ocr_scheme import SchemeManagerConnector  # 多引擎方案管理连接器
 
     qmlRegisterType(TagPageConnector, "TagPageConnector", 1, 0, "TagPageConnector")
     qmlRegisterType(MissionConnector, "MissionConnector", 1, 0, "MissionConnector")
@@ -105,6 +106,7 @@ def runQml(engineAddImportPath):
     qmlRegisterType(
         DocPreviewConnector, "DocPreviewConnector", 1, 0, "DocPreviewConnector"
     )
+    qmlRegisterType(SchemeManagerConnector, "SchemeManagerConnector", 1, 0, "SchemeManagerConnector")
 
     # ==================== 5. 启动翻译 ====================
     I18n.init(qtApp)
