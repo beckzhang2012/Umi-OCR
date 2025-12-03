@@ -431,6 +431,49 @@ TabPage {
                                 text: tr("粘贴"),
                                 toolTip: tr("粘贴图片"),
                             },
+                            {
+                                icon: "edit",
+                                onClicked: function() {
+                                    resultsTableView.editMode = !resultsTableView.editMode
+                                },
+                                color: resultsTableView.editMode ? theme.specialTextColor : theme.textColor,
+                                bgColor: theme.bgColor,
+                                toolTip: resultsTableView.editMode ? tr("退出编辑模式") : tr("进入编辑模式"),
+                            },
+                            {
+                                icon: "content-save",
+                                onClicked: function() {
+                                    // 获取最新的OCR结果
+                                    if(resultsTableView.resultsModel.count > 0) {
+                                        let lastResult = resultsTableView.resultsModel.get(resultsTableView.resultsModel.count - 1)
+                                        let res = JSON.parse(lastResult.source)
+                                        let result = resultsTableView.createEditRecord(res)
+                                        if(result.success) {
+                                            popup.toast(qsTr("编辑记录已保存"))
+                                        } else {
+                                            popup.toast(qsTr("保存失败：" + result.msg))
+                                        }
+                                    } else {
+                                        popup.toast(qsTr("没有可保存的OCR结果"))
+                                    }
+                                },
+                                color: theme.textColor,
+                                bgColor: theme.bgColor,
+                                toolTip: tr("保存编辑记录"),
+                            },
+                            {
+                                icon: "file-export",
+                                onClicked: function() {
+                                    if(resultsTableView.currentEditRecordId) {
+                                        resultsTableView.exportAsMarkdown(resultsTableView.currentEditRecordId)
+                                    } else {
+                                        popup.toast(qsTr("请先保存编辑记录"))
+                                    }
+                                },
+                                color: theme.textColor,
+                                bgColor: theme.bgColor,
+                                toolTip: tr("导出为Markdown"),
+                            },
                         ]
                     }
                     // 停止任务
@@ -485,6 +528,10 @@ TabPage {
                     id: resultsTableView
                     anchors.fill: parent
                     visible: false
+                    
+                    Component.onCompleted: {
+                        loadEditRecords()
+                    }
                 }
 
                 tabsModel: [
