@@ -3,6 +3,9 @@
 # ========================================
 
 from PySide2.QtGui import QClipboard  # 截图 剪贴板
+import json
+import os
+from datetime import datetime
 
 from umi_log import logger
 from .page import Page  # 页基类
@@ -20,6 +23,129 @@ class ScreenshotOCR(Page):
         super().__init__(*args)
         self.msnDict = {}
         self.recentResult = []  # 缓存本轮任务的识别结果，提交给 <<ScreenshotOcrEnd>>
+        self.export_dir = os.path.join(os.path.expanduser("~"), "UmiOCR", "ScreenshotOCR", "edits")
+        os.makedirs(self.export_dir, exist_ok=True)
+
+    def saveEditedResult(self, result_id, text, annotations, notes, tags):
+        """
+        保存编辑后的结果到JSON文件
+        :param result_id: 结果ID
+        :param text: 编辑后的文字
+        :param annotations: 标注信息
+        :param notes: 备注信息
+        :param tags: 标签信息
+        """
+        try:
+            # 创建保存目录
+            os.makedirs(self.export_dir, exist_ok=True)
+            
+            # 生成文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            json_filename = f"result_{result_id}_{timestamp}.json"
+            json_path = os.path.join(self.export_dir, json_filename)
+            
+            # 准备保存的数据
+            save_data = {
+                "result_id": result_id,
+                "text": text,
+                "annotations": annotations,
+                "notes": notes,
+                "tags": tags,
+                "save_time": timestamp,
+                "version": "1.0"
+            }
+            
+            # 保存为JSON文件
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
+            
+            logger.info(f"编辑结果已保存到: {json_path}")
+            return True
+        except Exception as e:
+            logger.error(f"保存编辑结果失败: {e}")
+            return False
+    
+    def exportToMarkdown(self, result_id, text, annotations, notes, tags):
+        """
+        导出编辑后的结果到Markdown文件
+        :param result_id: 结果ID
+        :param text: 编辑后的文字
+        :param annotations: 标注信息
+        :param notes: 备注信息
+        :param tags: 标签信息
+        """
+        try:
+            # 创建保存目录
+            os.makedirs(self.export_dir, exist_ok=True)
+            
+            # 生成文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            md_filename = f"result_{result_id}_{timestamp}.md"
+            md_path = os.path.join(self.export_dir, md_filename)
+            
+            # 生成Markdown内容
+            md_content = "# OCR识别结果（编辑后）\n\n"
+            
+            # 添加标签
+            if tags:
+                md_content += "## 标签\n"
+                for tag in tags:
+                    md_content += f"- {tag}\n"
+                md_content += "\n"
+            
+            # 添加备注
+            if notes:
+                md_content += "## 备注\n"
+                md_content += f"{notes}\n\n"
+            
+            # 添加标注后的文字
+            md_content += "## 文本内容\n\n"
+            
+            # 处理标注信息
+            if annotations:
+                # 按开始位置排序标注
+                sorted_annotations = sorted(annotations, key=lambda x: x["start"])
+                
+                current_pos = 0
+                for annotation in sorted_annotations:
+                    start = annotation["start"]
+                    end = annotation["end"]
+                    style = annotation["style"]
+                    
+                    # 添加标注前的文本
+                    md_content += text[current_pos:start]
+                    
+                    # 添加带标注的文本
+                    annotated_text = text[start:end]
+                    if style == "highlight":
+                        md_content += f"=={annotated_text}=="
+                    elif style == "underline":
+                        md_content += f"<u>{annotated_text}</u>"
+                    elif style == "strikethrough":
+                        md_content += f"~~{annotated_text}~~"
+                    else:
+                        md_content += annotated_text
+                    
+                    current_pos = end
+                
+                # 添加剩余文本
+                md_content += text[current_pos:]
+            else:
+                md_content += text
+            
+            # 添加保存时间
+            md_content += f"\n\n---\n保存时间: {timestamp}\n"
+            md_content += f"结果ID: {result_id}\n"
+            
+            # 保存为Markdown文件
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+            
+            logger.info(f"Markdown导出已保存到: {md_path}")
+            return True
+        except Exception as e:
+            logger.error(f"导出Markdown失败: {e}")
+            return False
 
     # ========================= 【qml调用python】 =========================
 

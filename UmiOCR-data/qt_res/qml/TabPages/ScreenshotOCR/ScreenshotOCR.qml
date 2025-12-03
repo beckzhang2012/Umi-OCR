@@ -300,6 +300,21 @@ TabPage {
                 toolTip: qsTr("停止任务")
                 onClicked: tabPage.msnStop()
             }
+
+            // 编辑模式切换按钮
+            CheckButton {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: width
+                icon_: "edit"
+                checked: resultsTableView.editMode
+                onCheckedChanged: resultsTableView.editMode = checked
+                toolTip: qsTr("编辑模式")
+                Shortcut {
+                    sequence: "Ctrl+E"
+                    onActivated: checked = !checked
+                }
+            }
         }
     }
 

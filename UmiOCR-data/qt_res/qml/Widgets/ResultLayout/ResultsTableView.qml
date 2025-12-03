@@ -8,10 +8,12 @@ import "../"
 
 Item {
     ListModel { id: resultsModel } // OCR结果模型
+    property bool editMode: false // 全局编辑模式开关
 
-    // ========================= 【对外接口】 =========================
+    // ==================== 【对外接口】 =========================
 
     property alias ctrlBar: ctrlBar // 控制栏的引用
+    property alias editMode: editMode
 
     // 添加一条OCR结果。元素：
     // timestamp 时间戳，秒为单位
@@ -59,6 +61,11 @@ Item {
                 res.title += " | "+qsTr("置信度 %1").arg(t2)
             }
         }
+        // 初始化编辑字段
+        if (res.annotations === undefined) res.annotations = []
+        if (res.notes === undefined) res.notes = ""
+        if (res.tags === undefined) res.tags = []
+        if (res.isEdited === undefined) res.isEdited = false
         // 添加到列表模型
         resultsModel.append({
             "status__": status_,
@@ -70,6 +77,10 @@ Item {
             "selectR_": -1,
             "selectUpdate_": 0,
             "source": JSON.stringify(res), // 保存原始数据
+            "annotations": res.annotations,
+            "notes": res.notes,
+            "tags": res.tags,
+            "isEdited": res.isEdited
         })
         // 自动滚动
         if(autoToBottom) {
@@ -141,7 +152,7 @@ Item {
             })
         }
         // ==================== 【元素】 ====================
-        delegate: ResultTextContainer {
+        delegate: EditResultTextContainer {
             status_: status__
             textLeft: title
             textRight: datetime
@@ -150,33 +161,20 @@ Item {
             selectR: selectR_
             selectUpdate: selectUpdate_
             index_: index
+            editing: resultRoot.editMode
+            annotations: annotations
+            notes: notes
+            tags: tags
             onTextHeightChanged: tableView.forceLayout // 文字高度改变时重设列宽
             onTextMainChanged: {
-                // Bug!!!!!!!!!!
-                /*
-                以下代码的本意是：当用户修改输入框文本时，将修改后的文本同步到 resultsModel 中。
-                这样，当 TableView 动态加载文本框时，可以恢复用户编辑过的内容。
-                但是， onTextChanged 信号有个致命问题：不仅会在手动编辑文本时触发此信号，
-                当程序修改文本（如动态加载文本框时的赋值）甚至文本样式改变（比如选中一段文本，使其
-                背景色变化）都会触发此信号。
-                这就有几率触发一些bug，尤其是 TableView 动态加载时，可能一个物理输入框组件轮换展示
-                不同的逻辑内容，切换这些逻辑内容时触发 onTextChanged ，误将一个逻辑内容写入另外一个
-                resultsModel 槽位，导致吞掉另一个逻辑内容。
-                本质上，这是由于 TextEdit 组件没有 textEdited 信号。如果有，那就不会产生上述误判了。
-                相关：
-                https://forum.qt.io/topic/143841/textedited-signal-for-textarea-textedit/5
-                https://bugreports.qt.io/browse/QTBUG-103718
-                https://codereview.qt-project.org/c/qt/qtdeclarative/+/606008
-                上述链接指出，qt新版本或dev分支已为 TextEdit 补上 textEdited 信号。
-                但是，pyside2暂未更新此版本。
-                本项目作为临时措施，在下文用一些先验条件来判断当前的修改是否有可能由用户发起，
-                以此降低误判的概率。
-                */
-                if(!activeFocus_) return // 临时措施：排除没有焦点的文本修改
-                if(resText===textMain) return // 临时措施：排除文本内容无变化的修改
-
-                resultsModel.setProperty(index, "resText", textMain) // 文字改变时写入列表
+                if(!activeFocus_) return
+                if(resText===textMain) return
+                resultsModel.setProperty(index, "resText", textMain)
             }
+            onAnnotationsChanged: resultsModel.setProperty(index, "annotations", annotations)
+            onNotesChanged: resultsModel.setProperty(index, "notes", notes)
+            onTagsChanged: resultsModel.setProperty(index, "tags", tags)
+            onIsEditedChanged: resultsModel.setProperty(index, "isEdited", isEdited)
             copy: tableMouseArea.selectCopy
             copyAll: tableMouseArea.selectAllCopy
             selectAll: tableMouseArea.selectAll
