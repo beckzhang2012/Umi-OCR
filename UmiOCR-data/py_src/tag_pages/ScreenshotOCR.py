@@ -6,6 +6,7 @@ from PySide2.QtGui import QClipboard  # 截图 剪贴板
 
 from umi_log import logger
 from .page import Page  # 页基类
+from .ScreenshotOCREditor import ScreenshotOCREditor  # 截图OCR编辑器
 from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
@@ -15,7 +16,7 @@ from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
 Clipboard = QClipboard()  # 剪贴板
 
 
-class ScreenshotOCR(Page):
+class ScreenshotOCR(ScreenshotOCREditor):
     def __init__(self, *args):
         super().__init__(*args)
         self.msnDict = {}

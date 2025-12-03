@@ -6,6 +6,16 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import "../"
 
+// 编辑相关的信号
+signal editText(string text, int index)
+signal addAnnotation(string type, int start, int end, string color)
+signal deleteAnnotation(string id)
+signal addNote(string note)
+signal addTag(string tag)
+signal deleteTag(string tag)
+signal undo()
+signal redo()
+
 Item {
     ListModel { id: resultsModel } // OCR结果模型
 
@@ -183,6 +193,39 @@ Item {
             selectSingle: tableMouseArea.selectSingle
             selectDel: tableMouseArea.selectDel
             selectAllDel: tableMouseArea.selectAllDel
+
+            // 编辑相关的函数绑定
+            editText: function(text) {
+                resultsTableView.editText(text, index)
+            }
+
+            addAnnotation: function(type, start, end, color) {
+                resultsTableView.addAnnotation(type, start, end, color)
+            }
+
+            deleteAnnotation: function(id) {
+                resultsTableView.deleteAnnotation(id)
+            }
+
+            addNote: function(note) {
+                resultsTableView.addNote(note)
+            }
+
+            addTag: function(tag) {
+                resultsTableView.addTag(tag)
+            }
+
+            deleteTag: function(tag) {
+                resultsTableView.deleteTag(tag)
+            }
+
+            undo: function() {
+                resultsTableView.undo()
+            }
+
+            redo: function() {
+                resultsTableView.redo()
+            }
         } 
         // 滚动条
         ScrollBar.vertical: scrollBar
