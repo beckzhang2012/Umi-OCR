@@ -4,7 +4,7 @@
 
 import os
 import subprocess
-from PySide2.QtCore import QStandardPaths as Qsp, QFile, QFileInfo
+from PySide6.QtCore import QStandardPaths as Qsp, QFile, QFileInfo
 
 from umi_log import logger
 from umi_about import UmiAbout

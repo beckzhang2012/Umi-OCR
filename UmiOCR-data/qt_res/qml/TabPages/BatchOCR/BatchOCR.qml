@@ -51,7 +51,18 @@ TabPage {
         // 开始运行
         const paths = filesTableView.getColumnsValue("path")
         const argd = configsComp.getValueDict()
-        msnID = tabPage.callPy("msnPaths", paths, argd)
+        
+        // 检查是否启用多引擎模式
+        const multiEngineConfig = configsComp.getValue("multiEngine")
+        if(multiEngineConfig && multiEngineConfig.enabled && multiEngineConfig.selectedEngines.length > 0) {
+            // 使用多引擎模式
+            argd.multiEngine = multiEngineConfig
+            msnID = tabPage.callPy("msnMultiPaths", paths, argd)
+        } else {
+            // 使用单引擎模式
+            msnID = tabPage.callPy("msnPaths", paths, argd)
+        }
+        
         // 若tabPanel面板的下标没有变化过，则切换到记录页
         if(tabPanel.indexChangeNum < 2)
             tabPanel.currentIndex = 1
@@ -127,6 +138,35 @@ TabPage {
         // 提取文字，添加到结果表格
         res.title = res.fileName
         resultsTableView.addOcrResult(res)
+        ctrlPanel.msnStep(1) // 任务计数器步进
+    }
+    
+    // 获取多引擎OCR的返回值
+    function onMultiOcrGet(path, res) {
+        const time = res.time.toFixed(2)
+        let state = ""
+        
+        // 检查是否有错误
+        if(res.error) {
+            state = "× "+res.error
+            errorNum++
+        } else {
+            state = "√ "+qsTr("多引擎")
+        }
+        
+        // 刷新表格显示
+        filesTableView.set(path, { "time": time, "state": state })
+        
+        // 添加到结果表格
+        res.title = res.fileName
+        resultsTableView.addOcrResult(res)
+        
+        // 显示对比结果
+        if(res.engineResults) {
+            comparisonPanel.engineResults = res.engineResults
+            comparisonPanel.visible = true
+        }
+        
         ctrlPanel.msnStep(1) // 任务计数器步进
     }
 
@@ -284,6 +324,11 @@ TabPage {
                         "title": qsTr("记录"),
                         "component": resultsTableView,
                     },
+                    {
+                        "key": "comparison",
+                        "title": qsTr("对比"),
+                        "component": comparisonPanel,
+                    },
                 ]
             }
         }
@@ -308,5 +353,12 @@ TabPage {
         pathPreview: msnPreview
         configsComp: tabPage.configsComp
         configKey: "tbpu.ignoreArea"
+    }
+    
+    // 多引擎对比面板
+    ResultComparisonPanel {
+        id: comparisonPanel
+        anchors.fill: parent
+        visible: false
     }
 }

@@ -2,14 +2,15 @@
 # =============== qml与【后端Python任务控制器们】的连接器 ===============
 # =====================================================================
 
-from PySide2.QtCore import QObject, Slot, Signal
+from PySide6.QtCore import QObject, Slot, Signal
 
 # 本模块内定义的任务控制器单例
 from .mission_ocr import MissionOCR
+from .mission_multi_ocr import MissionMultiOCR
 from umi_log import logger
 
 # 控制器字典
-MsnObjDict = {"ocr": MissionOCR}
+MsnObjDict = {"ocr": MissionOCR, "multi_ocr": MissionMultiOCR}
 
 
 # 任务连接器类（不限制单例）

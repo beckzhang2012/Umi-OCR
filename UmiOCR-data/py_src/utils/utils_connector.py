@@ -1,10 +1,11 @@
 # 通用工具连接器
 
 from typing import List
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from . import utils
 from . import file_finder  # 文件搜索器
+from . import mission_multi_ocr_scheme  # 多引擎方案管理
 from ..platform import Platform  # 跨平台
 from .thread_pool import threadRun  # 异步执行函数
 
@@ -61,3 +62,36 @@ class UtilsConnector(QObject):
     @Slot("QVariant", result="QVariant")
     def QUrl2String(self, fileUrls):
         return utils.QUrl2String(fileUrls)
+
+    # 多引擎方案管理接口
+    @Slot()
+    def init_scheme_manager(self):
+        mission_multi_ocr_scheme.init_scheme_manager()
+
+    @Slot(str, str, str, str, result=str)
+    def create_scheme(self, name, engine1, engine2, strategy):
+        return mission_multi_ocr_scheme.create_scheme(name, engine1, engine2, strategy)
+
+    @Slot(str, str, str, str, str)
+    def save_scheme(self, scheme_id, name, engine1, engine2, strategy):
+        mission_multi_ocr_scheme.save_scheme(scheme_id, name, engine1, engine2, strategy)
+
+    @Slot(str, result="QVariant")
+    def load_scheme(self, scheme_id):
+        return mission_multi_ocr_scheme.load_scheme(scheme_id)
+
+    @Slot(str)
+    def delete_scheme(self, scheme_id):
+        mission_multi_ocr_scheme.delete_scheme(scheme_id)
+
+    @Slot(result="QVariant")
+    def list_schemes(self):
+        return mission_multi_ocr_scheme.list_schemes()
+
+    @Slot(str, str)
+    def export_scheme(self, scheme_id, file_path):
+        mission_multi_ocr_scheme.export_scheme(scheme_id, file_path)
+
+    @Slot(str, result=str)
+    def import_scheme(self, file_path):
+        return mission_multi_ocr_scheme.import_scheme(file_path)

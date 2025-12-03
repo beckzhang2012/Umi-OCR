@@ -275,6 +275,9 @@ Configs {
 
         // OCR接口全局设定
         "ocr": undefined,
+        
+        // 多引擎OCR接口全局设定
+        "multi_ocr": undefined,
 
         // 开发者工具
         "developer": {
@@ -300,11 +303,13 @@ Configs {
     // ========================= 【全局单例，通过 qmlapp.globalConfigs.xxx 访问】 =========================
 
     OcrManager { id: ocrManager } // OCR管理器 qmlapp.globalConfigs.ocrManager
+    MultiOcrManager { id: multiOcrManager } // 多引擎OCR管理器 qmlapp.globalConfigs.multiOcrManager
     UtilsConfigDicts { id: utilsDicts } // 通用配置项 qmlapp.globalConfigs.utilsDicts
     GlobalConfigsConnector { id: globalConfigConn } // 全局设置连接器
     PluginsConnector { id: pluginsConnector } // 插件全局设置连接器
 
     property alias ocrManager: ocrManager
+    property alias multiOcrManager: multiOcrManager
     property alias utilsDicts: utilsDicts
     property bool isPortInit: false // 标记端口号是否初始化完毕
     property var fontPanel: undefined // 缓存字体控制面板组件引用
@@ -321,6 +326,9 @@ Configs {
         // 应用OCR信息
         if(configDict.ocr)
             ocrManager.init2()
+        // 应用多引擎OCR信息
+        if(configDict.multi_ocr)
+            multiOcrManager.init2()
         console.log("GlobalConfig 初始化全局配置完毕！")
         // 延迟执行
         Qt.callLater(()=>{
@@ -362,6 +370,9 @@ Configs {
             // 初始化OCR管理器
             if(pluginInfos.options.ocr)
                 ocrManager.init1(pluginInfos.options.ocr)
+            // 初始化多引擎OCR管理器
+            if(pluginInfos.options.ocr)
+                multiOcrManager.init1(pluginInfos.options.ocr)
         }
     }
 

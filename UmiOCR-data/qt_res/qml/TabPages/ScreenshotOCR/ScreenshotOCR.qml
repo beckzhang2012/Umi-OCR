@@ -36,7 +36,18 @@ TabPage {
             return
         }
         const configDict = configsComp.getValueDict()
-        tabPage.callPy("ocrImgID", clipID, configDict)
+        
+        // 检查是否启用多引擎模式
+        const multiEngineConfig = configsComp.getValue("multiEngine")
+        if(multiEngineConfig && multiEngineConfig.enabled && multiEngineConfig.selectedEngines.length > 0) {
+            // 使用多引擎模式
+            configDict.multiEngine = multiEngineConfig
+            tabPage.callPy("ocrMultiImgID", clipID, configDict)
+        } else {
+            // 使用单引擎模式
+            tabPage.callPy("ocrImgID", clipID, configDict)
+        }
+        
         qmlapp.tab.showTabPageObj(tabPage) // 切换标签页
         imageText.showImgID(clipID) // 展示图片
     }
@@ -55,7 +66,17 @@ TabPage {
         }
         // 进行识别
         const configDict = configsComp.getValueDict()
-        tabPage.callPy("ocrImgID", clipID, configDict)
+        
+        // 检查是否启用多引擎模式
+        const multiEngineConfig = configsComp.getValue("multiEngine")
+        if(multiEngineConfig && multiEngineConfig.enabled && multiEngineConfig.selectedEngines.length > 0) {
+            // 使用多引擎模式
+            configDict.multiEngine = multiEngineConfig
+            tabPage.callPy("ocrMultiImgID", clipID, configDict)
+        } else {
+            // 使用单引擎模式
+            tabPage.callPy("ocrImgID", clipID, configDict)
+        }
     }
 
     // 开始粘贴
@@ -78,7 +99,17 @@ TabPage {
         if(res.imgID) { // 图片
             imageText.showImgID(res.imgID)
             const configDict = configsComp.getValueDict()
-            tabPage.callPy("ocrImgID", res.imgID, configDict)
+            
+            // 检查是否启用多引擎模式
+            const multiEngineConfig = configsComp.getValue("multiEngine")
+            if(multiEngineConfig && multiEngineConfig.enabled && multiEngineConfig.selectedEngines.length > 0) {
+                // 使用多引擎模式
+                configDict.multiEngine = multiEngineConfig
+                tabPage.callPy("ocrMultiImgID", res.imgID, configDict)
+            } else {
+                // 使用单引擎模式
+                tabPage.callPy("ocrImgID", res.imgID, configDict)
+            }
         }
         else if(res.paths) { // 地址
             ocrPaths(res.paths)
@@ -187,6 +218,35 @@ TabPage {
         showSimple(res, resText, copy)
         // 升起主窗口
         popMainWindow()
+    }
+    
+    // 获取多引擎OCR的返回值
+    function onMultiOcrGet(res, imgID="", imgPath="") {
+        // 添加到结果
+        const resText = resultsTableView.addOcrResult(res)
+        if(imgID) // 图片类型
+            imageText.showImgID(imgID)
+        else if(imgPath) // 地址类型
+            imageText.showPath(imgPath)
+        imageText.showTextBoxes(res)
+        // 若tabPanel面板的下标没有变化过，则切换到记录页
+        if(tabPanel.indexChangeNum < 2)
+            tabPanel.currentIndex = 1
+        // 复制到剪贴板
+        const copy = configsComp.getValue("action.copy")
+        if(copy && resText!="")
+            qmlapp.utilsConnector.copyText(resText)
+        // 弹出通知
+        showSimple(res, resText, copy)
+        // 升起主窗口
+        popMainWindow()
+        
+        // 显示对比结果
+        if(res.engineResults) {
+            comparisonPanel.engineResults = res.engineResults
+            comparisonPanel.visible = true
+            tabPanel.currentIndex = 2 // 切换到对比面板
+        }
     }
 
     // 一组OCR任务完毕
@@ -498,6 +558,11 @@ TabPage {
                         "title": qsTr("记录"),
                         "component": resultsTableView,
                     },
+                    {
+                        "key": "comparison",
+                        "title": qsTr("对比"),
+                        "component": comparisonPanel,
+                    },
                 ]
             }
         }
@@ -507,5 +572,12 @@ TabPage {
     DropArea_ {
         anchors.fill: parent
         callback: tabPage.ocrPaths
+    }
+    
+    // 多引擎对比面板
+    ResultComparisonPanel {
+        id: comparisonPanel
+        anchors.fill: parent
+        visible: false
     }
 }

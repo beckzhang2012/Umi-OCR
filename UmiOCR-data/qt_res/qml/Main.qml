@@ -18,6 +18,7 @@ import "EventBus"
 import "Popup_"
 import "MainWindow"
 import "ImageManager"
+import "ApiManager"
 
 Window {
     id: mainWindowRoot

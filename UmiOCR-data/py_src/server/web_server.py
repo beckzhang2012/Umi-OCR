@@ -3,7 +3,7 @@
 # ======= http接口可复用于跨进程命令行、防止多开等方面 ========
 # =========================================================
 
-from PySide2.QtCore import QThreadPool, QRunnable
+from PySide6.QtCore import QThreadPool, QRunnable
 from wsgiref.simple_server import make_server, WSGIServer
 
 from umi_log import logger
