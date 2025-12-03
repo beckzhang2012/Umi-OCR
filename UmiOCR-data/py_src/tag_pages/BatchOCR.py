@@ -100,6 +100,11 @@ class BatchOCR(Page):
             "outputFileName": argd["mission.fileName"],  # 输出文件名（前缀）
             "startDatetime": argd["startDatetime"],  # 开始日期
             "ignoreBlank": argd["mission.ignoreBlank"],  # 忽略空白文件
+            # 导出选项
+            "includeImage": argd.get("mission.includeImage", False),  # 是否包含图片
+            "includeConfidence": argd.get("mission.includeConfidence", True),  # 是否包含置信度
+            "formatStyle": argd.get("mission.formatStyle", "default"),  # 格式样式
+            "exportFields": argd.get("mission.exportFields", ["fileName", "text", "score"]),  # 导出字段
         }
         try:
             for key in argd.keys():

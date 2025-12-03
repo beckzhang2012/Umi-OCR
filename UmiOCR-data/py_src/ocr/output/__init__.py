@@ -2,8 +2,11 @@ from .output_txt import OutputTxt
 from .output_txt_plain import OutputTxtPlain
 from .output_txt_individual import OutputTxtIndividual
 from .output_md import OutputMD
+from .output_md_table import OutputMDTable
 from .output_jsonl import OutputJsonl
 from .output_csv import OutputCsv
+from .output_html import OutputHTML
+from .output_excel import OutputExcel
 from .output_pdf_layered import OutputPdfLayered
 from .output_pdf_one_layer import OutputPdfOneLayer
 
@@ -22,8 +25,12 @@ Output = {
     "txtPlain": OutputTxtPlain,
     "txtIndividual": OutputTxtIndividual,
     "md": OutputMD,
+    "mdTable": OutputMDTable,
     "jsonl": OutputJsonl,
     "csv": OutputCsv,
+    # 富文本输出器
+    "html": OutputHTML,
+    "excel": OutputExcel,
     # PDF输出器，需要额外的参数 "originPath" 原始文件路径
     "pdfLayered": OutputPdfLayered,
     "pdfOneLayer": OutputPdfOneLayer,
