@@ -485,6 +485,39 @@ TabPage {
                     id: resultsTableView
                     anchors.fill: parent
                     visible: false
+
+                    // 编辑相关的函数绑定
+                    onEditText: function(text, index) {
+                        tabPage.callPy("editText", text, index)
+                    }
+
+                    onAddAnnotation: function(type, start, end, color) {
+                        tabPage.callPy("addAnnotation", type, start, end, color)
+                    }
+
+                    onDeleteAnnotation: function(id) {
+                        tabPage.callPy("deleteAnnotation", id)
+                    }
+
+                    onAddNote: function(note) {
+                        tabPage.callPy("addNote", note)
+                    }
+
+                    onAddTag: function(tag) {
+                        tabPage.callPy("addTag", tag)
+                    }
+
+                    onDeleteTag: function(tag) {
+                        tabPage.callPy("deleteTag", tag)
+                    }
+
+                    onUndo: function() {
+                        tabPage.callPy("undo")
+                    }
+
+                    onRedo: function() {
+                        tabPage.callPy("redo")
+                    }
                 }
 
                 tabsModel: [
