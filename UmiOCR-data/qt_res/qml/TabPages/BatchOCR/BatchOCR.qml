@@ -272,12 +272,24 @@ TabPage {
                     anchors.fill: parent
                     visible: false
                 }
+                
+                // 模板管理器组件
+                TemplateManager {
+                    id: templateManager
+                    configsComp: configsComp
+                    anchors.fill: parent
+                }
 
                 tabsModel: [
                     {
                         "key": "configs",
                         "title": qsTr("设置"),
                         "component": configsComp.panelComponent,
+                    },
+                    {
+                        "key": "templates",
+                        "title": qsTr("模板"),
+                        "component": templateManager,
                     },
                     {
                         "key": "ocrResult",
