@@ -55,6 +55,12 @@ Item {
             title: qsTr("关于"),
             intro: qsTr("# 关于")
         },
+        {
+            key: "Statistics",
+            needController: true,
+            title: qsTr("统计"),
+            intro: qsTr("# 统计\n\n查看OCR识别的统计数据，包括识别次数、成功率、常用词汇等。")
+        },
     ]
 
     /* 存放当前已打开的页面

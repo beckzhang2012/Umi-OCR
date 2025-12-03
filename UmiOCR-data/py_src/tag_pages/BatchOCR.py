@@ -150,6 +150,8 @@ class BatchOCR(Page):
         # 补充参数
         res["fileName"] = os.path.basename(msn["path"])
         res["dir"] = os.path.dirname(msn["path"])
+        # 保存识别记录
+        self.saveOCRRecord(res)
         # 输出器输出
         for o in self.outputList:
             try:
@@ -178,3 +180,35 @@ class BatchOCR(Page):
 
     def _onPreview(self, msnInfo, msn, res):
         self.callQmlInMain("onPreview", msn["path"], res)
+
+    def saveOCRRecord(self, record):
+        """保存OCR识别记录"""
+        try:
+            import os
+            import json
+            from datetime import datetime
+            # 确保记录目录存在
+            records_dir = os.path.join(os.path.expanduser("~"), "UmiOCR", "BatchOCR", "records")
+            if not os.path.exists(records_dir):
+                os.makedirs(records_dir)
+            # 获取今天的日期作为文件名
+            today = datetime.date.today().isoformat()
+            file_path = os.path.join(records_dir, f"{today}.json")
+            # 添加时间戳
+            record["timestamp"] = datetime.datetime.now().isoformat()
+            # 读取现有记录
+            records = []
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        records = json.load(f)
+                except Exception as e:
+                    logger.error(f"读取记录文件 {file_path} 失败: {e}")
+                    records = []
+            # 添加新记录
+            records.append(record)
+            # 保存记录
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(records, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"保存OCR记录失败: {e}")
