@@ -10,6 +10,7 @@ from .page import Page  # 页基类
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..utils.utils import allowedFileName
 from ..ocr.output import Output  # 输出器
+from ..modules.template_manager import template_manager  # 模板管理器
 
 
 class BatchOCR(Page):
@@ -178,3 +179,50 @@ class BatchOCR(Page):
 
     def _onPreview(self, msnInfo, msn, res):
         self.callQmlInMain("onPreview", msn["path"], res)
+
+    # ========================= 【模板管理功能】 =========================
+
+    def saveTemplate(self, template_name, template_desc, config_data):
+        """保存模板"""
+        try:
+            result = template_manager.save_template(template_name, template_desc, config_data)
+            return result
+        except Exception as e:
+            logger.error(f"保存模板失败: {e}", exc_info=True)
+            return f"[Error] 保存模板失败: {str(e)}"
+
+    def loadTemplate(self, template_name):
+        """加载模板"""
+        try:
+            result = template_manager.load_template(template_name)
+            return result
+        except Exception as e:
+            logger.error(f"加载模板失败: {e}", exc_info=True)
+            return None
+
+    def deleteTemplate(self, template_name):
+        """删除模板"""
+        try:
+            result = template_manager.delete_template(template_name)
+            return result
+        except Exception as e:
+            logger.error(f"删除模板失败: {e}", exc_info=True)
+            return f"[Error] 删除模板失败: {str(e)}"
+
+    def renameTemplate(self, old_name, new_name):
+        """重命名模板"""
+        try:
+            result = template_manager.rename_template(old_name, new_name)
+            return result
+        except Exception as e:
+            logger.error(f"重命名模板失败: {e}", exc_info=True)
+            return f"[Error] 重命名模板失败: {str(e)}"
+
+    def listTemplates(self):
+        """列出所有模板"""
+        try:
+            templates = template_manager.list_templates()
+            return templates
+        except Exception as e:
+            logger.error(f"获取模板列表失败: {e}", exc_info=True)
+            return []
