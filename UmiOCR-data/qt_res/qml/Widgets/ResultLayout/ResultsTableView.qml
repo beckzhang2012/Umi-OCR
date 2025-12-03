@@ -8,10 +8,122 @@ import "../"
 
 Item {
     ListModel { id: resultsModel } // OCR结果模型
+    ListModel { id: editRecordsModel } // 编辑记录模型
 
     // ========================= 【对外接口】 =========================
 
     property alias ctrlBar: ctrlBar // 控制栏的引用
+    property bool editMode: false // 编辑模式开关
+    property string currentEditRecordId: "" // 当前编辑记录ID
+    
+    // 创建编辑记录
+    function createEditRecord(res) {
+        let result = callPy("ScreenshotOCR", "create_edit_record", res)
+        if(result.success) {
+            currentEditRecordId = result.data.id
+            loadEditRecords()
+            return result
+        }
+        return result
+    }
+    
+    // 更新编辑文本
+    function updateEditedText(recordId, newText) {
+        return callPy("ScreenshotOCR", "update_edited_text", recordId, newText)
+    }
+    
+    // 添加标注
+    function addAnnotation(recordId, annotation) {
+        return callPy("ScreenshotOCR", "add_annotation", recordId, annotation)
+    }
+    
+    // 删除标注
+    function deleteAnnotation(recordId, annotationId) {
+        return callPy("ScreenshotOCR", "delete_annotation", recordId, annotationId)
+    }
+    
+    // 更新备注
+    function updateNotes(recordId, notes) {
+        return callPy("ScreenshotOCR", "update_notes", recordId, notes)
+    }
+    
+    // 添加标签
+    function addTag(recordId, tag) {
+        return callPy("ScreenshotOCR", "add_tag", recordId, tag)
+    }
+    
+    // 移除标签
+    function removeTag(recordId, tag) {
+        return callPy("ScreenshotOCR", "remove_tag", recordId, tag)
+    }
+    
+    // 撤销操作
+    function undoEdit() {
+        let result = callPy("ScreenshotOCR", "undo_edit")
+        if(result.success) {
+            loadEditRecord(currentEditRecordId)
+        }
+        return result
+    }
+    
+    // 重做操作
+    function redoEdit() {
+        let result = callPy("ScreenshotOCR", "redo_edit")
+        if(result.success) {
+            loadEditRecord(currentEditRecordId)
+        }
+        return result
+    }
+    
+    // 加载编辑记录
+    function loadEditRecord(recordId) {
+        let result = callPy("ScreenshotOCR", "get_edit_record", recordId)
+        if(result.success) {
+            let record = result.data
+            // 查找对应的结果项并更新文本
+            for(let i=0; i<resultsModel.count; i++) {
+                let item = resultsModel.get(i)
+                if(item.timestamp === record.create_time) {
+                    resultsModel.setProperty(i, "resText", record.edited_text)
+                    break
+                }
+            }
+            currentEditRecordId = recordId
+        }
+        return result
+    }
+    
+    // 加载所有编辑记录
+    function loadEditRecords() {
+        let result = callPy("ScreenshotOCR", "get_all_edit_records")
+        if(result.success) {
+            editRecordsModel.clear()
+            result.data.forEach(record => {
+                editRecordsModel.append(record)
+            })
+        }
+        return result
+    }
+    
+    // 导出为Markdown
+    function exportAsMarkdown(recordId) {
+        let result = callPy("ScreenshotOCR", "export_as_markdown", recordId)
+        if(result.success) {
+            // 将Markdown内容保存到文件
+            let saveFile = Qt.createQmlObject('import QtQuick.Dialogs 1.3; FileDialog {}', parent)
+            saveFile.selectExisting = false
+            saveFile.filters = ["Markdown files (*.md)", "All files (*)"]
+            saveFile.onAccepted: {
+                let file = Qt.openFile(saveFile.fileUrl, "w")
+                if(file.open()) {
+                    file.write(result.data)
+                    file.close()
+                }
+            }
+            saveFile.open()
+        }
+        return result
+    }
 
     // 添加一条OCR结果。元素：
     // timestamp 时间戳，秒为单位
@@ -150,6 +262,8 @@ Item {
             selectR: selectR_
             selectUpdate: selectUpdate_
             index_: index
+            editMode: parent.editMode
+            currentEditRecordId: parent.currentEditRecordId
             onTextHeightChanged: tableView.forceLayout // 文字高度改变时重设列宽
             onTextMainChanged: {
                 // Bug!!!!!!!!!!
@@ -174,8 +288,13 @@ Item {
                 */
                 if(!activeFocus_) return // 临时措施：排除没有焦点的文本修改
                 if(resText===textMain) return // 临时措施：排除文本内容无变化的修改
+                if(!editMode) return // 编辑模式未开启时不保存修改
 
                 resultsModel.setProperty(index, "resText", textMain) // 文字改变时写入列表
+                // 更新到后端
+                if(currentEditRecordId) {
+                    parent.updateEditedText(currentEditRecordId, textMain)
+                }
             }
             copy: tableMouseArea.selectCopy
             copyAll: tableMouseArea.selectAllCopy
@@ -183,6 +302,11 @@ Item {
             selectSingle: tableMouseArea.selectSingle
             selectDel: tableMouseArea.selectDel
             selectAllDel: tableMouseArea.selectAllDel
+            onAddAnnotation: function(annotation) {
+                if(currentEditRecordId) {
+                    parent.addAnnotation(currentEditRecordId, annotation)
+                }
+            }
         } 
         // 滚动条
         ScrollBar.vertical: scrollBar

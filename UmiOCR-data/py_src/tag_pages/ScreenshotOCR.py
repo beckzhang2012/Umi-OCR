@@ -9,6 +9,7 @@ from .page import Page  # 页基类
 from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
+from ..utils.edit_manager import EditManager
 
 # 只要触发了截图/粘贴/图片识图任务，并结束任务（无论是否成功），都发送 <<ScreenshotOcrEnd>> 事件。
 
@@ -20,6 +21,7 @@ class ScreenshotOCR(Page):
         super().__init__(*args)
         self.msnDict = {}
         self.recentResult = []  # 缓存本轮任务的识别结果，提交给 <<ScreenshotOcrEnd>>
+        self.edit_manager = EditManager("ScreenshotOCR")
 
     # ========================= 【qml调用python】 =========================
 
@@ -122,3 +124,62 @@ class ScreenshotOCR(Page):
             self.callQml("onOcrEnd", msg)
 
         self.callFunc(update)  # 在主线程中执行
+
+    # =============================================
+    # =============== 编辑功能接口 ===============
+    # =============================================
+    def create_edit_record(self, ocr_result):
+        """创建编辑记录"""
+        return self.edit_manager.create_new_record(ocr_result)
+        
+    def update_edited_text(self, record_id, new_text):
+        """更新编辑文本"""
+        return self.edit_manager.update_edited_text(record_id, new_text)
+        
+    def add_annotation(self, record_id, annotation):
+        """添加标注"""
+        return self.edit_manager.add_annotation(record_id, annotation)
+        
+    def update_annotation(self, record_id, annotation_id, new_annotation):
+        """更新标注"""
+        return self.edit_manager.update_annotation(record_id, annotation_id, new_annotation)
+        
+    def delete_annotation(self, record_id, annotation_id):
+        """删除标注"""
+        return self.edit_manager.delete_annotation(record_id, annotation_id)
+        
+    def update_notes(self, record_id, notes):
+        """更新备注"""
+        return self.edit_manager.update_notes(record_id, notes)
+        
+    def add_tag(self, record_id, tag):
+        """添加标签"""
+        return self.edit_manager.add_tag(record_id, tag)
+        
+    def remove_tag(self, record_id, tag):
+        """移除标签"""
+        return self.edit_manager.remove_tag(record_id, tag)
+        
+    def undo_edit(self):
+        """撤销编辑"""
+        return self.edit_manager.undo()
+        
+    def redo_edit(self):
+        """重做编辑"""
+        return self.edit_manager.redo()
+        
+    def get_edit_record(self, record_id):
+        """获取编辑记录"""
+        return self.edit_manager.get_record(record_id)
+        
+    def get_all_edit_records(self):
+        """获取所有编辑记录"""
+        return self.edit_manager.get_all_records()
+        
+    def delete_edit_record(self, record_id):
+        """删除编辑记录"""
+        return self.edit_manager.delete_record(record_id)
+        
+    def export_as_markdown(self, record_id):
+        """导出为Markdown"""
+        return self.edit_manager.export_as_markdown(record_id)

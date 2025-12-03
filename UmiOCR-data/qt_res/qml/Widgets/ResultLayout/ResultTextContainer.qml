@@ -27,6 +27,13 @@ Item {
     property var selectAll: undefined // 所有文本框全选
     property var selectDel: undefined // 删除单个
     property var selectAllDel: undefined // 清空
+    
+    // 编辑模式
+    property bool editMode: false
+    property string currentEditRecordId: ""
+    
+    // 标注信号
+    signal addAnnotation(var annotation)
 
     // 传入一个相对于item的坐标，返回该坐标位于this组件的什么位置。
     // undefined:不在组件中 | -1:顶部信息栏 | 0~N:所在字符的下标
@@ -121,6 +128,76 @@ Item {
         }
     }
 
+    // 标注工具栏
+    RowLayout {
+        id: annotationToolbar
+        visible: editMode && textMain_.selectionStart !== textMain_.selectionEnd
+        anchors.top: resultBottom.top
+        anchors.left: parent.left
+        anchors.leftMargin: textMain_.anchors.leftMargin + textMain_.positionToRectangle(textMain_.selectionStart).x
+        spacing: size_.smallSpacing
+        z: 10
+        
+        Rectangle {
+            color: theme.bgColor
+            radius: size_.baseRadius
+            border.color: theme.borderColor
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: size_.smallSpacing
+                spacing: size_.smallSpacing
+                
+                ToolButton {
+                    text: qsTr("高亮")
+                    onClicked: {
+                        if(textMain_.selectionStart !== textMain_.selectionEnd) {
+                            let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                            let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                            resultRoot.addAnnotation({
+                                type: "highlight",
+                                start: start,
+                                end: end,
+                                color: "#FFFF00"
+                            })
+                        }
+                    }
+                }
+                
+                ToolButton {
+                    text: qsTr("下划线")
+                    onClicked: {
+                        if(textMain_.selectionStart !== textMain_.selectionEnd) {
+                            let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                            let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                            resultRoot.addAnnotation({
+                                type: "underline",
+                                start: start,
+                                end: end,
+                                color: "#0000FF"
+                            })
+                        }
+                    }
+                }
+                
+                ToolButton {
+                    text: qsTr("删除线")
+                    onClicked: {
+                        if(textMain_.selectionStart !== textMain_.selectionEnd) {
+                            let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                            let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                            resultRoot.addAnnotation({
+                                type: "strikethrough",
+                                start: start,
+                                end: end,
+                                color: "#FF0000"
+                            })
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // 下方主要文字内容
     Rectangle {
         id: resultBottom
@@ -130,7 +207,7 @@ Item {
         anchors.right: parent.right
         // anchors.topMargin: size_.smallSpacing
         radius: size_.baseRadius
-        height: textMain_.height
+        height: textMain_.height + (annotationToolbar.visible ? annotationToolbar.height + size_.smallSpacing : 0)
 
         TextEdit_ {
             id: textMain_
@@ -138,15 +215,77 @@ Item {
             anchors.right: parent.right
             anchors.leftMargin: size_.smallSpacing
             anchors.rightMargin: size_.smallSpacing
-            readOnly: false // 可编辑
+            anchors.topMargin: annotationToolbar.visible ? annotationToolbar.height + size_.smallSpacing : 0
+            readOnly: !editMode // 编辑模式下可编辑
             persistentSelection: true // 丢失焦点时，保留选区
             color: status_==="error"? theme.noColor:theme.textColor
+            
+            // 右键菜单
+            Menu {
+                id: textMenu
+                visible: editMode
+                
+                MenuItem {
+                    text: qsTr("添加高亮")
+                    enabled: textMain_.selectionStart !== textMain_.selectionEnd
+                    onTriggered: {
+                        let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                        let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                        resultRoot.addAnnotation({
+                            type: "highlight",
+                            start: start,
+                            end: end,
+                            color: "#FFFF00"
+                        })
+                    }
+                }
+                
+                MenuItem {
+                    text: qsTr("添加下划线")
+                    enabled: textMain_.selectionStart !== textMain_.selectionEnd
+                    onTriggered: {
+                        let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                        let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                        resultRoot.addAnnotation({
+                            type: "underline",
+                            start: start,
+                            end: end,
+                            color: "#0000FF"
+                        })
+                    }
+                }
+                
+                MenuItem {
+                    text: qsTr("添加删除线")
+                    enabled: textMain_.selectionStart !== textMain_.selectionEnd
+                    onTriggered: {
+                        let start = Math.min(textMain_.selectionStart, textMain_.selectionEnd)
+                        let end = Math.max(textMain_.selectionStart, textMain_.selectionEnd)
+                        resultRoot.addAnnotation({
+                            type: "strikethrough",
+                            start: start,
+                            end: end,
+                            color: "#FF0000"
+                        })
+                    }
+                }
+            }
+            
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton
+                onClicked: {
+                    if(editMode && textMain_.selectionStart !== textMain_.selectionEnd) {
+                        textMenu.popup()
+                    }
+                }
+            }
 
             // 按键事件。响应并拦截：单双击 Ctrl+C ，双击 Ctrl+A
             property int keyDoubleTime: 300 // 双击毫秒
             property int lastUpTime: -1 // 上次按键抬起的时间戳。需要截取后8位以免int放不下
             property int lastKey: -1 // 上次按键的键值
-            property var listeningKeys: [Qt.Key_A, Qt.Key_C, Qt.Key_D]
+            property var listeningKeys: [Qt.Key_A, Qt.Key_C, Qt.Key_D, Qt.Key_Z, Qt.Key_Y]
             Keys.onPressed: {
                 if (event.modifiers & Qt.ControlModifier) {
                     if (listeningKeys.includes(event.key)) {
@@ -161,6 +300,8 @@ Item {
                         else { // 单击
                             event.key===Qt.Key_A && resultRoot.selectSingle && resultRoot.selectSingle()
                             event.key===Qt.Key_C && resultRoot.copy && resultRoot.copy()
+                            event.key===Qt.Key_Z && resultRoot.parent && resultRoot.parent.undoEdit && resultRoot.parent.undoEdit()
+                            event.key===Qt.Key_Y && resultRoot.parent && resultRoot.parent.redoEdit && resultRoot.parent.redoEdit()
                         }
                     }
                 }
