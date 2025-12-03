@@ -5,7 +5,7 @@
 import os
 import shlex
 import subprocess
-from PySide2.QtCore import QStandardPaths as Qsp
+from PySide6.QtCore import QStandardPaths as Qsp
 
 from umi_log import logger
 from umi_about import UmiAbout

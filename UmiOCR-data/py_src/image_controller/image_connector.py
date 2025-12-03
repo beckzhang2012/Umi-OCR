@@ -5,7 +5,7 @@
 from .image_provider import copyImage, saveImage, openImage
 from .screenshot_controller import ScreenshotController
 
-from PySide2.QtCore import QObject, Slot, Signal
+from PySide6.QtCore import QObject, Slot, Signal
 
 
 class ImageConnector(QObject):

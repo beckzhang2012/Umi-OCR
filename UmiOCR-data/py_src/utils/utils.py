@@ -4,9 +4,9 @@
 
 import re
 import os
-from PySide2.QtGui import QClipboard
-from PySide2.QtCore import QFileInfo
-from PySide2.QtQml import QJSValue
+from PySide6.QtGui import QClipboard
+from PySide6.QtCore import QFileInfo
+from PySide6.QtQml import QJSValue
 from urllib.parse import unquote  # 路径解码
 
 from umi_log import logger

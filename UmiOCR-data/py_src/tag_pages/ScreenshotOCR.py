@@ -2,7 +2,7 @@
 # =============== 截图OCR页 ===============
 # ========================================
 
-from PySide2.QtGui import QClipboard  # 截图 剪贴板
+from PySide6.QtGui import QClipboard  # 截图 剪贴板
 
 from umi_log import logger
 from .page import Page  # 页基类

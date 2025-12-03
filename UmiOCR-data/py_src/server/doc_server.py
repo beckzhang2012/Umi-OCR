@@ -6,7 +6,7 @@ import shutil
 import zipfile
 from urllib.parse import urlparse
 from uuid import uuid4
-from PySide2.QtCore import QMutex
+from PySide6.QtCore import QMutex
 from typing import Dict
 
 from umi_log import logger

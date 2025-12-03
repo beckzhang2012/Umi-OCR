@@ -8,6 +8,8 @@ import "../../Configs"
 Configs {
     category_: "BatchOCR"
     signal clickIgnoreArea() // 打开忽略区域
+    signal clickSaveTemplate() // 保存为模板
+    signal clickLoadTemplate() // 加载模板
 
     configDict: {
         // OCR参数
@@ -29,6 +31,16 @@ Configs {
                 "type": "var",
                 "save": false,
             },
+        },
+
+        // 模板操作
+        "template": {
+            "title": qsTr("模板操作"),
+            "type": "buttons",
+            "btnsList": [
+                {"text":qsTr("保存为模板"), "onClicked": clickSaveTemplate},
+                {"text":qsTr("加载模板"), "onClicked": clickLoadTemplate},
+            ],
         },
 
         // 任务参数

@@ -196,6 +196,207 @@ TabPage {
                 ignoreArea.show()
             }
         }
+        
+        // 保存为模板
+        onClickSaveTemplate: {
+            saveTemplateDialog.open()
+        }
+        
+        // 加载模板
+        onClickLoadTemplate: {
+            loadTemplateDialog.open()
+        }
+    }
+    
+    // 保存模板对话框
+    Component {
+        id: saveTemplateDialogComponent
+        Dialog {
+            id: dialog
+            title: qsTr("保存为模板")
+            width: 400
+            height: 200
+            modal: true
+            visible: false
+            
+            Column {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 10
+                
+                TextField {
+                    id: templateName
+                    placeholderText: qsTr("模板名称")
+                }
+                
+                TextArea {
+                    id: templateDescription
+                    placeholderText: qsTr("模板描述")
+                    height: 100
+                }
+            }
+            
+            ButtonBox {
+                id: buttonBox
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                standardButtons: Dialog.Ok | Dialog.Cancel
+                
+                onAccepted: {
+                    if(templateName.text.trim() === "") {
+                        qmlapp.popup.message(qsTr("提示"), qsTr("模板名称不能为空"), "warning")
+                        return
+                    }
+                    
+                    const configs = configsComp.getValueDict()
+                    const success = tabPage.callPy("save_template", templateName.text.trim(), templateDescription.text.trim(), configs)
+                    
+                    if(success) {
+                        qmlapp.popup.message(qsTr("提示"), qsTr("模板保存成功"), "success")
+                    } else {
+                        qmlapp.popup.message(qsTr("提示"), qsTr("模板保存失败"), "error")
+                    }
+                    
+                    dialog.close()
+                }
+                
+                onRejected: {
+                    dialog.close()
+                }
+            }
+        }
+    }
+    
+    Item {
+        id: saveTemplateDialog
+        component: saveTemplateDialogComponent
+    }
+    
+    // 加载模板对话框
+    Component {
+        id: loadTemplateDialogComponent
+        Dialog {
+            id: dialog
+            title: qsTr("加载模板")
+            width: 400
+            height: 300
+            modal: true
+            visible: false
+            
+            Column {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 10
+                
+                TextField {
+                    id: searchTemplate
+                    placeholderText: qsTr("搜索模板")
+                    onTextChanged: {
+                        updateTemplateList()
+                    }
+                }
+                
+                ListView {
+                    id: templateList
+                    height: 200
+                    model: []
+                    delegate: Item {
+                        width: parent.width
+                        height: 60
+                        
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            spacing: 5
+                            
+                            Text {
+                                text: modelData.name
+                                font.bold: true
+                            }
+                            
+                            Text {
+                                text: modelData.description
+                                font.pointSize: 10
+                                color: "#666666"
+                                elide: Text.ElideRight
+                            }
+                        }
+                        
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: "#0078d4"
+                            width: 60
+                            height: 30
+                            radius: 5
+                            
+                            Text {
+                                anchors.centerIn: parent
+                                text: qsTr("加载")
+                                color: "white"
+                                font.pointSize: 10
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    loadTemplate(modelData.name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            ButtonBox {
+                id: buttonBox2
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                standardButtons: Dialog.Cancel
+                
+                onRejected: {
+                    dialog.close()
+                }
+            }
+        }
+    }
+    
+    Item {
+        id: loadTemplateDialog
+        component: loadTemplateDialogComponent
+    }
+    
+    // 更新模板列表
+    function updateTemplateList() {
+        const templates = tabPage.callPy("get_templates")
+        let filteredTemplates = templates
+        
+        if(searchTemplate.text.trim() !== "") {
+            filteredTemplates = templates.filter(t => 
+                t.name.toLowerCase().includes(searchTemplate.text.trim().toLowerCase()) ||
+                t.description.toLowerCase().includes(searchTemplate.text.trim().toLowerCase())
+            )
+        }
+        
+        templateList.model = filteredTemplates
+    }
+    
+    // 加载模板
+    function loadTemplate(name) {
+        const configs = tabPage.callPy("load_template", name)
+        
+        if(configs) {
+            // 填充所有配置项
+            for(let key in configs) {
+                configsComp.setValue(key, configs[key])
+            }
+            
+            qmlapp.popup.message(qsTr("提示"), qsTr("模板加载成功"), "success")
+        } else {
+            qmlapp.popup.message(qsTr("提示"), qsTr("模板加载失败"), "error")
+        }
+        
+        loadTemplateDialog.close()
     }
     // 主区域：可切换双栏面板
     DoubleSwitchableLayout {

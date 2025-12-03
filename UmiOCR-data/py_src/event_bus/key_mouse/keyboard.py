@@ -1,5 +1,5 @@
 from pynput import keyboard
-from PySide2.QtCore import QMutex
+from PySide6.QtCore import QMutex
 from time import time
 
 from umi_log import logger

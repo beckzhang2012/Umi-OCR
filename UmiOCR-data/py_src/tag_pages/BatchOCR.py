@@ -4,6 +4,7 @@
 
 import os
 import time
+import json
 
 from umi_log import logger
 from .page import Page  # 页基类
@@ -18,6 +19,88 @@ class BatchOCR(Page):
         self.argd = None
         self.msnID = ""
         self.outputList = []  # 输出器列表
+        
+        # 模板相关
+        self.templates_dir = os.path.join(os.path.dirname(__file__), "..", "..")
+        self.templates_file = os.path.join(self.templates_dir, "batch_ocr_templates.json")
+        self.templates = self.load_templates()
+    
+    def load_templates(self):
+        """加载所有模板"""
+        if not os.path.exists(self.templates_file):
+            return []
+        
+        try:
+            with open(self.templates_file, "r", encoding="utf-8") as f:
+                templates = json.load(f)
+            return templates
+        except Exception as e:
+            logger.error(f"加载模板失败：{e}")
+            return []
+    
+    def save_templates(self):
+        """保存所有模板"""
+        try:
+            with open(self.templates_file, "w", encoding="utf-8") as f:
+                json.dump(self.templates, f, ensure_ascii=False, indent=4)
+            return True
+        except Exception as e:
+            logger.error(f"保存模板失败：{e}")
+            return False
+    
+    def save_template(self, name, description, configs):
+        """保存模板"""
+        template = {
+            "name": name,
+            "description": description,
+            "configs": configs,
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # 检查是否已存在同名模板
+        for i, t in enumerate(self.templates):
+            if t["name"] == name:
+                self.templates[i] = template
+                return self.save_templates()
+        
+        # 不存在则添加
+        self.templates.append(template)
+        return self.save_templates()
+    
+    def load_template(self, name):
+        """加载模板"""
+        for template in self.templates:
+            if template["name"] == name:
+                return template["configs"]
+        return None
+    
+    def delete_template(self, name):
+        """删除模板"""
+        for i, template in enumerate(self.templates):
+            if template["name"] == name:
+                del self.templates[i]
+                return self.save_templates()
+        return False
+    
+    def rename_template(self, old_name, new_name):
+        """重命名模板"""
+        # 检查新名称是否已存在
+        for template in self.templates:
+            if template["name"] == new_name:
+                return False
+        
+        # 找到旧模板并更新名称
+        for template in self.templates:
+            if template["name"] == old_name:
+                template["name"] = new_name
+                template["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                return self.save_templates()
+        return False
+    
+    def get_templates(self):
+        """获取所有模板"""
+        return self.templates
 
     # ========================= 【qml调用python】 =========================
 
