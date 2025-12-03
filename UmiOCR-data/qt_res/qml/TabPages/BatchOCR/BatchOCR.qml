@@ -9,6 +9,7 @@ import ".."
 import "../../Widgets"
 import "../../Widgets/ResultLayout"
 import "../../Widgets/IgnoreArea"
+import "../../Components"
 
 TabPage {
     id: tabPage
@@ -17,6 +18,8 @@ TabPage {
 
     property int errorNum: 0 // 异常的任务个数
     property string msnID: "" // 当前任务ID
+    property bool isMultiEngineMode: false // 是否启用多引擎模式
+    property var multiOCRResult: null // 多引擎OCR结果
 
     Component.onCompleted: {
     }
@@ -51,10 +54,21 @@ TabPage {
         // 开始运行
         const paths = filesTableView.getColumnsValue("path")
         const argd = configsComp.getValueDict()
-        msnID = tabPage.callPy("msnPaths", paths, argd)
-        // 若tabPanel面板的下标没有变化过，则切换到记录页
-        if(tabPanel.indexChangeNum < 2)
-            tabPanel.currentIndex = 1
+        
+        // 根据模式选择不同的OCR方法
+        if (isMultiEngineMode) {
+            // 多引擎模式
+            msnID = tabPage.callPy("msnMultiEnginePaths", paths, argd)
+            // 切换到多引擎对比面板
+            tabPanel.currentIndex = 2
+        } else {
+            // 单引擎模式
+            msnID = tabPage.callPy("msnPaths", paths, argd)
+            // 切换到记录页
+            if(tabPanel.indexChangeNum < 2)
+                tabPanel.currentIndex = 1
+        }
+        
         ctrlPanel.runFinished(msnLength)
     }
 
@@ -63,6 +77,60 @@ TabPage {
         _ocrStop()
         tabPage.callPy("msnStop")
         ctrlPanel.stopFinished()
+    }
+    
+    // 切换多引擎模式
+    function toggleMultiEngineMode() {
+        isMultiEngineMode = !isMultiEngineMode
+        tabPage.callPy("setMultiEngineMode", isMultiEngineMode)
+        
+        // 如果启用多引擎模式，显示对比面板
+        if (isMultiEngineMode) {
+            multiOCRComparisonPanel.visible = true
+            multiOCRComparisonPanel.reset()
+        } else {
+            multiOCRComparisonPanel.visible = false
+        }
+    }
+    
+    // 选择OCR引擎
+    function selectEngines(engines) {
+        tabPage.callPy("selectEngines", engines)
+    }
+    
+    // 选择多引擎方案
+    function selectProfile(profileName) {
+        tabPage.callPy("selectProfile", profileName)
+    }
+    
+    // 设置对比策略
+    function setComparisonStrategy(strategy) {
+        tabPage.callPy("setComparisonStrategy", strategy)
+    }
+    
+    // 导出对比报告
+    function exportComparisonReport() {
+        const fileName = qmlapp.fileDialog.getSaveFileName(
+            qsTr("导出对比报告"),
+            "",
+            qsTr("JSON文件 (*.json);;文本文件 (*.txt);;HTML文件 (*.html)")
+        )
+        
+        if (fileName) {
+            let format = "json"
+            if (fileName.endsWith(".txt")) {
+                format = "text"
+            } else if (fileName.endsWith(".html")) {
+                format = "html"
+            }
+            
+            tabPage.callPy("exportComparisonReport", fileName, format)
+        }
+    }
+    
+    // 获取最佳结果
+    function getBestResult() {
+        return tabPage.callPy("getBestResult")
     }
 
     function _ocrStop() {
@@ -128,6 +196,39 @@ TabPage {
         res.title = res.fileName
         resultsTableView.addOcrResult(res)
         ctrlPanel.msnStep(1) // 任务计数器步进
+    }
+    
+    // 多引擎OCR结果准备就绪
+    function onMultiOCRResultReady(result) {
+        multiOCRResult = result
+        multiOCRComparisonPanel.setResult(result)
+        
+        // 切换到对比面板
+        if (isMultiEngineMode) {
+            multiOCRComparisonPanel.visible = true
+        }
+        
+        // 更新文件表格状态
+        for (let path in result.engines) {
+            if (result.engines.hasOwnProperty(path)) {
+                filesTableView.set(path, { 
+                    "time": result.engines[path].time.toFixed(2), 
+                    "state": qsTr("多引擎对比完成") 
+                })
+            }
+        }
+        
+        ctrlPanel.msnStep(1) // 任务计数器步进
+    }
+    
+    // 多引擎OCR进度更新
+    function onMultiOCRProgress(current, total, status) {
+        multiOCRComparisonPanel.updateProgress(current, total, status)
+    }
+    
+    // 多引擎OCR消息通知
+    function onMultiOCRMessage(message) {
+        qmlapp.popup.simple(qsTr("多引擎OCR"), message)
     }
 
     // 任务队列完毕
@@ -283,6 +384,13 @@ TabPage {
                         "key": "ocrResult",
                         "title": qsTr("记录"),
                         "component": resultsTableView,
+                        visible: !isMultiEngineMode
+                    },
+                    {
+                        "key": "multiOCRComparison",
+                        "title": qsTr("多引擎对比"),
+                        "component": multiOCRComparisonPanel,
+                        visible: isMultiEngineMode
                     },
                 ]
             }
@@ -300,6 +408,18 @@ TabPage {
         id: previewImage
         anchors.fill: parent
     }
+    
+    // 多引擎对比面板
+    MultiOCRComparisonPanel {
+        id: multiOCRComparisonPanel
+        anchors.fill: parent
+        visible: false
+        
+        onEngineSelectionChanged: tabPage.selectEngines(engines)
+        onProfileSelected: tabPage.selectProfile(profileName)
+        onComparisonStrategyChanged: tabPage.setComparisonStrategy(strategy)
+        onExportReport: tabPage.exportComparisonReport()
+    }
 
     // 忽略区域编辑器
     IgnoreArea {
@@ -308,5 +428,21 @@ TabPage {
         pathPreview: msnPreview
         configsComp: tabPage.configsComp
         configKey: "tbpu.ignoreArea"
+    }
+    
+    // 确保多引擎对比面板在启用时可见
+    Connections {
+        target: tabPage
+        onIsMultiEngineModeChanged: {
+            if (isMultiEngineMode) {
+                tabPanel.currentIndex = 2 // 切换到多引擎对比标签页
+                multiOCRComparisonPanel.visible = true
+            } else {
+                multiOCRComparisonPanel.visible = false
+                if (tabPanel.currentIndex === 2) {
+                    tabPanel.currentIndex = 1 // 切换回记录标签页
+                }
+            }
+        }
     }
 }

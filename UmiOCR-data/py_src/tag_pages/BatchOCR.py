@@ -8,6 +8,8 @@ import time
 from umi_log import logger
 from .page import Page  # 页基类
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
+from ..mission.mission_multi_ocr import MissionMultiOCR  # 多引擎OCR任务管理器
+from ..multi_ocr_bridge import MultiOCRBridgeInstance  # 多引擎桥接
 from ..utils.utils import allowedFileName
 from ..ocr.output import Output  # 输出器
 
@@ -18,10 +20,24 @@ class BatchOCR(Page):
         self.argd = None
         self.msnID = ""
         self.outputList = []  # 输出器列表
+        self.is_multi_engine_mode = False  # 是否启用多引擎模式
+        self.multi_ocr_result = None  # 多引擎OCR结果
 
     # ========================= 【qml调用python】 =========================
 
     def msnPaths(self, paths, argd):  # 接收路径列表和配置参数字典，开始OCR任务
+        # 检查是否启用多引擎模式
+        self.is_multi_engine_mode = argd.get("mission.multiEngineMode", False)
+        
+        if self.is_multi_engine_mode:
+            # 使用多引擎OCR
+            return self._msnMultiEnginePaths(paths, argd)
+        else:
+            # 使用单引擎OCR
+            return self._msnSingleEnginePaths(paths, argd)
+    
+    def _msnSingleEnginePaths(self, paths, argd):
+        """单引擎OCR任务处理"""
         # 任务信息
         msnInfo = {
             "onStart": self._onStart,
@@ -42,7 +58,25 @@ class BatchOCR(Page):
         if self.msnID.startswith("[Error]"):  # 添加任务失败
             self._onEnd(None, f"{self.msnID}\n添加任务失败。")
         else:  # 添加成功，通知前端刷新UI
-            logger.debug(f"添加任务成功 {self.msnID}")
+            logger.debug(f"添加单引擎任务成功 {self.msnID}")
+        return self.msnID
+    
+    def _msnMultiEnginePaths(self, paths, argd):
+        """多引擎OCR任务处理"""
+        # 预处理参数字典
+        if not self._preprocessArgd(argd, paths[0]):
+            return ""
+        
+        # 使用多引擎桥接执行任务
+        MultiOCRBridgeInstance.startMultiOCRComparison(paths, argd["mission.dir"])
+        
+        # 连接多引擎结果信号
+        MultiOCRBridgeInstance.comparisonResultReady.connect(self._onMultiOCRResultReady)
+        MultiOCRBridgeInstance.progressUpdated.connect(self._onMultiOCRProgress)
+        MultiOCRBridgeInstance.messageReady.connect(self._onMultiOCRMessage)
+        
+        self.msnID = "multi_engine_task"
+        logger.debug("添加多引擎任务成功")
         return self.msnID
 
     def _preprocessArgd(self, argd, path0):  # 预处理参数字典，无异常返回True
@@ -114,13 +148,22 @@ class BatchOCR(Page):
         return True
 
     def msnStop(self):  # 任务停止
-        MissionOCR.stopMissionList(self.msnID)
+        if self.is_multi_engine_mode:
+            MissionMultiOCR.stopMissionList(self.msnID)
+        else:
+            MissionOCR.stopMissionList(self.msnID)
 
     def msnPause(self):  # 任务暂停
-        MissionOCR.pauseMissionList(self.msnID)
+        if self.is_multi_engine_mode:
+            MissionMultiOCR.pauseMissionList(self.msnID)
+        else:
+            MissionOCR.pauseMissionList(self.msnID)
 
     def msnResume(self):  # 任务恢复
-        MissionOCR.resumeMissionList(self.msnID)
+        if self.is_multi_engine_mode:
+            MissionMultiOCR.resumeMissionList(self.msnID)
+        else:
+            MissionOCR.resumeMissionList(self.msnID)
 
     def msnPreview(self, path, argd):  # 快速进行一次任务，主要用于预览
         msnInfo = {
@@ -160,10 +203,19 @@ class BatchOCR(Page):
         self.callQmlInMain("onOcrGet", msn["path"], res)  # 在主线程中调用qml
 
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
+        if self.is_multi_engine_mode:
+            # 多引擎模式下的结束处理
+            self._onMultiOCREnd(msnInfo, msg)
+        else:
+            # 单引擎模式下的结束处理
+            self._onSingleOCREnd(msnInfo, msg)
+    
+    def _onSingleOCREnd(self, msnInfo, msg):
+        """单引擎OCR任务结束处理"""
         if msnInfo:
             msnID = msnInfo["msnID"]
             if msnID != self.msnID:
-                logger.warning(f"_onEnd 任务ID未在记录。{msnID}")
+                logger.warning(f"_onSingleOCREnd 任务ID未在记录。{msnID}")
                 return
         else:
             msnID = ""
@@ -175,6 +227,73 @@ class BatchOCR(Page):
                 msg = f"[Error] 输出器异常：{e}" + msg
         # msg: [Success] [Warning] [Error]
         self.callQmlInMain("onOcrEnd", msg, msnID)
+    
+    def _onMultiOCREnd(self, msnInfo, msg):
+        """多引擎OCR任务结束处理"""
+        # 断开多引擎信号连接
+        MultiOCRBridgeInstance.comparisonResultReady.disconnect(self._onMultiOCRResultReady)
+        MultiOCRBridgeInstance.progressUpdated.disconnect(self._onMultiOCRProgress)
+        MultiOCRBridgeInstance.messageReady.disconnect(self._onMultiOCRMessage)
+        
+        # 通知前端任务结束
+        self.callQmlInMain("onOcrEnd", msg, self.msnID)
+    
+    def _onMultiOCRResultReady(self, result):
+        """多引擎OCR结果准备就绪"""
+        self.multi_ocr_result = result
+        
+        # 通知前端显示多引擎对比结果
+        self.callQmlInMain("onMultiOCRResultReady", result)
+        
+        # 如果需要，输出多引擎对比报告
+        if self.argd.get("mission.exportComparisonReport", False):
+            report_format = self.argd.get("mission.comparisonReportFormat", "json")
+            report_path = os.path.join(
+                self.argd["mission.dir"],
+                f"{self.argd['mission.fileName']}_comparison_report.{report_format}"
+            )
+            MultiOCRBridgeInstance.generateComparisonReport(report_path, report_format)
+    
+    def _onMultiOCRProgress(self, current, total, status):
+        """多引擎OCR进度更新"""
+        self.callQmlInMain("onMultiOCRProgress", current, total, status)
+    
+    def _onMultiOCRMessage(self, message):
+        """多引擎OCR消息通知"""
+        self.callQmlInMain("onMultiOCRMessage", message)
 
     def _onPreview(self, msnInfo, msn, res):
         self.callQmlInMain("onPreview", msn["path"], res)
+    
+    # ========================= 【多引擎相关方法】 =========================
+    
+    def getMultiOCRResult(self):
+        """获取多引擎OCR结果"""
+        return self.multi_ocr_result
+    
+    def getBestResult(self):
+        """获取最佳结果"""
+        if not self.multi_ocr_result:
+            return ""
+        return MultiOCRBridgeInstance.getBestResult()
+    
+    def exportComparisonReport(self, report_path, report_format="json"):
+        """导出对比报告"""
+        MultiOCRBridgeInstance.generateComparisonReport(report_path, report_format)
+    
+    def setMultiEngineMode(self, enabled):
+        """设置多引擎模式"""
+        self.is_multi_engine_mode = enabled
+        MultiOCRBridgeInstance.setMultiEngineMode(enabled)
+    
+    def selectEngines(self, engines):
+        """选择OCR引擎"""
+        MultiOCRBridgeInstance.selectEngines(engines)
+    
+    def selectProfile(self, profile_name):
+        """选择多引擎方案"""
+        MultiOCRBridgeInstance.selectProfile(profile_name)
+    
+    def setComparisonStrategy(self, strategy):
+        """设置对比策略"""
+        MultiOCRBridgeInstance.setComparisonStrategy(strategy)

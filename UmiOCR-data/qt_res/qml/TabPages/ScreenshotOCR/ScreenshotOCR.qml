@@ -9,12 +9,15 @@ import ".."
 import "../../Widgets"
 import "../../Widgets/ResultLayout"
 import "../../Widgets/ImageViewer"
+import "../../Components"
 
 TabPage {
     id: tabPage
     // 配置
     configsComp: ScreenshotOcrConfigs {}
     property string msnState: "none" // OCR任务状态， none run
+    property bool isMultiEngineMode: false // 是否启用多引擎模式
+    property var multiOCRResult: null // 多引擎OCR结果
 
     // ========================= 【逻辑】 =========================
 
@@ -106,6 +109,60 @@ TabPage {
     function msnStop() {
         tabPage.callPy("msnStop")
     }
+    
+    // 切换多引擎模式
+    function toggleMultiEngineMode() {
+        isMultiEngineMode = !isMultiEngineMode
+        tabPage.callPy("setMultiEngineMode", isMultiEngineMode)
+        
+        // 如果启用多引擎模式，显示对比面板
+        if (isMultiEngineMode) {
+            multiOCRComparisonPanel.visible = true
+            multiOCRComparisonPanel.reset()
+        } else {
+            multiOCRComparisonPanel.visible = false
+        }
+    }
+    
+    // 选择OCR引擎
+    function selectEngines(engines) {
+        tabPage.callPy("selectEngines", engines)
+    }
+    
+    // 选择多引擎方案
+    function selectProfile(profileName) {
+        tabPage.callPy("selectProfile", profileName)
+    }
+    
+    // 设置对比策略
+    function setComparisonStrategy(strategy) {
+        tabPage.callPy("setComparisonStrategy", strategy)
+    }
+    
+    // 导出对比报告
+    function exportComparisonReport() {
+        const fileName = qmlapp.fileDialog.getSaveFileName(
+            qsTr("导出对比报告"),
+            "",
+            qsTr("JSON文件 (*.json);;文本文件 (*.txt);;HTML文件 (*.html)")
+        )
+        
+        if (fileName) {
+            let format = "json"
+            if (fileName.endsWith(".txt")) {
+                format = "text"
+            } else if (fileName.endsWith(".html")) {
+                format = "html"
+            }
+            
+            tabPage.callPy("exportComparisonReport", fileName, format)
+        }
+    }
+    
+    // 获取最佳结果
+    function getBestResult() {
+        return tabPage.callPy("getBestResult")
+    }
 
     // 关闭页面
     function closePage() {
@@ -187,6 +244,36 @@ TabPage {
         showSimple(res, resText, copy)
         // 升起主窗口
         popMainWindow()
+    }
+    
+    // 多引擎OCR结果准备就绪
+    function onMultiOCRResultReady(result) {
+        multiOCRResult = result
+        multiOCRComparisonPanel.setResult(result)
+        
+        // 切换到对比面板
+        if (isMultiEngineMode) {
+            multiOCRComparisonPanel.visible = true
+        }
+        
+        // 复制最佳结果到剪贴板
+        const copy = configsComp.getValue("action.copy")
+        if (copy && result.best_result && result.best_result.text) {
+            qmlapp.utilsConnector.copyText(result.best_result.text)
+        }
+        
+        // 升起主窗口
+        popMainWindow()
+    }
+    
+    // 多引擎OCR进度更新
+    function onMultiOCRProgress(current, total, status) {
+        multiOCRComparisonPanel.updateProgress(current, total, status)
+    }
+    
+    // 多引擎OCR消息通知
+    function onMultiOCRMessage(message) {
+        qmlapp.popup.simple(qsTr("多引擎OCR"), message)
     }
 
     // 一组OCR任务完毕
@@ -335,6 +422,17 @@ TabPage {
                     anchors.bottom: parent.bottom
                     spacing: size_.smallSpacing
 
+                    // 多引擎模式切换
+                    CheckButton {
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        text_: qsTr("多引擎")
+                        toolTip: qsTr("启用多引擎对比模式\n同时使用多个OCR引擎进行识别并对比结果")
+                        checked: isMultiEngineMode
+                        enabledAnime: true
+                        onCheckedChanged: tabPage.toggleMultiEngineMode()
+                    }
+                    
                     // 显示文字
                     CheckButton {
                         anchors.top: parent.top
@@ -345,6 +443,7 @@ TabPage {
                         enabledAnime: true
                         onCheckedChanged: imageText.showOverlay = checked
                     }
+                    
                     IconButtonBar {
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
@@ -369,8 +468,15 @@ TabPage {
                                 onClicked: imageText.imageScaleAddSub,
                                 toolTip: tr("图片大小：实际"),
                             },
+                            {
+                                icon: "export",
+                                onClicked: tabPage.exportComparisonReport,
+                                toolTip: tr("导出对比报告"),
+                                visible: isMultiEngineMode
+                            },
                         ]
                     }
+                    
                     // 百分比显示
                     Text_ {
                         anchors.top: parent.top
@@ -486,6 +592,18 @@ TabPage {
                     anchors.fill: parent
                     visible: false
                 }
+                
+                // 多引擎对比面板
+                MultiOCRComparisonPanel {
+                    id: multiOCRComparisonPanel
+                    anchors.fill: parent
+                    visible: false
+                    
+                    onEngineSelectionChanged: tabPage.selectEngines(engines)
+                    onProfileSelected: tabPage.selectProfile(profileName)
+                    onComparisonStrategyChanged: tabPage.setComparisonStrategy(strategy)
+                    onExportReport: tabPage.exportComparisonReport()
+                }
 
                 tabsModel: [
                     {
@@ -497,6 +615,13 @@ TabPage {
                         "key": "ocrResult",
                         "title": qsTr("记录"),
                         "component": resultsTableView,
+                        visible: !isMultiEngineMode
+                    },
+                    {
+                        "key": "multiOCRComparison",
+                        "title": qsTr("多引擎对比"),
+                        "component": multiOCRComparisonPanel,
+                        visible: isMultiEngineMode
                     },
                 ]
             }
@@ -507,5 +632,21 @@ TabPage {
     DropArea_ {
         anchors.fill: parent
         callback: tabPage.ocrPaths
+    }
+    
+    // 确保多引擎对比面板在启用时可见
+    Connections {
+        target: tabPage
+        onIsMultiEngineModeChanged: {
+            if (isMultiEngineMode) {
+                tabPanel.currentIndex = 2 // 切换到多引擎对比标签页
+                multiOCRComparisonPanel.visible = true
+            } else {
+                multiOCRComparisonPanel.visible = false
+                if (tabPanel.currentIndex === 2) {
+                    tabPanel.currentIndex = 1 // 切换回记录标签页
+                }
+            }
+        }
     }
 }
