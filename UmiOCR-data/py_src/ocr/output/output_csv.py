@@ -1,10 +1,11 @@
 # 输出到csv表格文件
 
 import csv
-
+import io
 from umi_log import logger
 from .output import Output
 from .tools import getDataText
+from ...utils.safe_file_ops import safe_write, ensure_directory_exists
 
 
 class OutputCsv(Output):
@@ -24,9 +25,11 @@ class OutputCsv(Output):
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
         self.writeLists = []  # 输出内容列表
         self.writeText = ""  # 输出内容字符串
-        try:  # 覆盖创建临时文件
-            with open(self.outputPath, "w", encoding="utf-8") as f:
-                pass
+        # 确保目录存在
+        ensure_directory_exists(self.outputPath)
+        # 创建输出文件
+        try:
+            safe_write(self.outputPath, "", mode="w", encoding="utf-8", description="csv_output_init")
         except Exception as e:
             raise Exception(f"Failed to create csv file. {e}\n创建csv文件失败。")
 
@@ -59,12 +62,17 @@ class OutputCsv(Output):
         # 创建文件、输出
         headers = ["Name", "OCR", "Path"]  # 表头
         try:
-            with open(
-                self.outputPath, "w", encoding=encoding, newline=""
-            ) as f:  # 覆盖创建文件
-                writer = csv.writer(f)
-                writer.writerow(headers)  # 写入CSV表头
-                for writeList in self.writeLists:
-                    writer.writerow(writeList)  # 写入CSV内容
+            # 使用内存缓冲区构建CSV内容
+            output = io.StringIO(newline='')
+            writer = csv.writer(output)
+            writer.writerow(headers)  # 写入CSV表头
+            for writeList in self.writeLists:
+                writer.writerow(writeList)  # 写入CSV内容
+            
+            # 获取CSV内容并写入文件
+            csv_content = output.getvalue()
+            output.close()
+            
+            safe_write(self.outputPath, csv_content, mode="w", encoding=encoding, description="csv_output_onend")
         except Exception as e:
             raise Exception(f"Failed to write csv file. {e}\n写入csv文件失败。")

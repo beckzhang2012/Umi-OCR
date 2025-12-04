@@ -2,6 +2,7 @@
 
 from .output import Output
 from .tools import getDataText
+from ...utils.safe_file_ops import safe_write, ensure_directory_exists
 
 
 class OutputTxtPlain(Output):
@@ -9,9 +10,11 @@ class OutputTxtPlain(Output):
         self.dir = argd["outputDir"]  # 输出路径（文件夹）
         self.fileName = argd["outputFileName"]  # 文件名
         self.outputPath = f"{self.dir}/{self.fileName}.p.txt"  # 输出路径
+        # 确保目录存在
+        ensure_directory_exists(self.outputPath)
         # 创建输出文件
         try:
-            open(self.outputPath, "w").close()  # 覆盖创建文件
+            safe_write(self.outputPath, "", mode="w", encoding="utf-8", description="txt_plain_output_init")
         except Exception as e:
             raise Exception(
                 f"Failed to create plain txt file. {e}\n创建纯文本txt文件失败。"
@@ -25,5 +28,5 @@ class OutputTxtPlain(Output):
             textOut += getDataText(res["data"])  # 获取拼接结果
             if not textOut[-1] == "\n":  # 确保结尾有换行
                 textOut += "\n"
-        with open(self.outputPath, "a", encoding="utf-8") as f:  # 追加写入本地文件
-            f.write(textOut)
+        # 追加写入文件
+        safe_write(self.outputPath, textOut, mode="a", encoding="utf-8", description="txt_plain_output_print")
