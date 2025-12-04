@@ -115,9 +115,9 @@ def initRuntimeEnvironment():
         if os.path.exists(path):
             site.addsitedir(path)
     # 初始化Qt搜索路径为相对路径，避免上层目录存在中文编码
-    from PySide2.QtCore import QCoreApplication
+    from PySide6.QtCore import QCoreApplication
 
-    QCoreApplication.addLibraryPath("./site-packages/PySide2/plugins")
+    QCoreApplication.addLibraryPath("./site-packages/PySide6/plugins")
 
 
 if __name__ == "__main__":
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         # 启动正式入口
         from py_src.run import main
 
-        main(app_path=app_path, engineAddImportPath="./site-packages/PySide2/qml")
+        main(app_path=app_path, engineAddImportPath="./site-packages/PySide6/qml")
     except Exception:
         err = traceback.format_exc()
         from py_src.imports.umi_log import logger, Logs_Dir

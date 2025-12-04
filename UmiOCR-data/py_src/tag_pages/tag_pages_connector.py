@@ -7,7 +7,7 @@
 前端页面访问各种后端功能，必须靠这个控制器作为中转。
 """
 
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from umi_log import logger
 
@@ -16,10 +16,11 @@ from .BatchOCR import BatchOCR
 from .BatchDOC import BatchDOC
 from .ScreenshotOCR import ScreenshotOCR
 from .QRCode import QRCode
+from .task_scheduler import TaskSchedulerController
 from ..utils.call_func import CallFunc
 
 # 控制器类列表
-PageClass = [BatchOCR, ScreenshotOCR, QRCode, BatchDOC]
+PageClass = [BatchOCR, ScreenshotOCR, QRCode, BatchDOC, TaskSchedulerController]
 
 
 TagPageConnObj = None  # 记录实例

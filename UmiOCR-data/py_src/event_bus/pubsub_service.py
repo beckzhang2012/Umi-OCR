@@ -2,7 +2,7 @@
 # =============== 发布/订阅模式 ===============
 # ============================================
 
-from PySide2.QtCore import QObject, Slot, Signal, QMutex, QThread, QCoreApplication
+from PySide6.QtCore import QObject, Slot, Signal, QMutex, QThread, QCoreApplication
 
 from umi_log import logger
 
