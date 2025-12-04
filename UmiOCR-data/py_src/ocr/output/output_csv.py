@@ -1,14 +1,18 @@
 # 输出到csv表格文件
 
 import csv
+import os
+import tempfile
 
 from umi_log import logger
 from .output import Output
 from .tools import getDataText
+from ...utils.file_writer import SafeFileWriter
 
 
 class OutputCsv(Output):
     def __init__(self, argd):
+        super().__init__(argd)
         self.encodings = [  # 保存编码优先级
             "ansi",  # Windows系统本地编码。在linux和macos下会抛出异常
             "ascii",  # 纯英
@@ -24,8 +28,9 @@ class OutputCsv(Output):
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
         self.writeLists = []  # 输出内容列表
         self.writeText = ""  # 输出内容字符串
+        self.tempPath = os.path.join(tempfile.gettempdir(), f"UmiOCR_{os.getpid()}.csv")
         try:  # 覆盖创建临时文件
-            with open(self.outputPath, "w", encoding="utf-8") as f:
+            with SafeFileWriter(self.tempPath, "w", encoding="utf-8") as f:
                 pass
         except Exception as e:
             raise Exception(f"Failed to create csv file. {e}\n创建csv文件失败。")
@@ -59,12 +64,14 @@ class OutputCsv(Output):
         # 创建文件、输出
         headers = ["Name", "OCR", "Path"]  # 表头
         try:
-            with open(
-                self.outputPath, "w", encoding=encoding, newline=""
-            ) as f:  # 覆盖创建文件
-                writer = csv.writer(f)
+            with SafeFileWriter(self.outputPath, "w", encoding=encoding, newline="") as f:  # 覆盖创建文件
+                writer = csv.writer(f._file)
                 writer.writerow(headers)  # 写入CSV表头
                 for writeList in self.writeLists:
                     writer.writerow(writeList)  # 写入CSV内容
         except Exception as e:
             raise Exception(f"Failed to write csv file. {e}\n写入csv文件失败。")
+        # 删除临时文件
+        if os.path.exists(self.tempPath):
+            os.remove(self.tempPath)
+        super().onEnd()
