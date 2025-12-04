@@ -46,6 +46,12 @@ Item {
                 + " `Aztec, Codabar, Code128, Code39, Code93, DataBar, DataBarExpanded, DataMatrix, EAN13, EAN8, ITF, LinearCodes, MatrixCodes, MaxiCode, MicroQRCode, PDF417, QRCode, UPCA, UPCE`",
         },
         {
+            key: "TaskScheduler",
+            needController: true,
+            title: qsTr("任务排程"),
+            intro: qsTr("# 任务排程\n\n定时执行预设的OCR或文档处理任务。")
+        },
+        {
             key: "GlobalConfigsPage",
             title: qsTr("全局设置"),
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")

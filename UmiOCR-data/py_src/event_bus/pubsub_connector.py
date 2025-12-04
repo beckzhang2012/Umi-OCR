@@ -2,7 +2,7 @@
 # =============== 发布/订阅连接器，在qml调用 ===============
 # ========================================================
 
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from .pubsub_service import PubSubService
 from umi_log import logger

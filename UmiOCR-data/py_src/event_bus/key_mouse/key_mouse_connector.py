@@ -2,7 +2,7 @@
 # =============== 键盘/鼠标连接器，在qml调用 ===============
 # ========================================================
 
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from .keyboard import HotkeyCtrl
 

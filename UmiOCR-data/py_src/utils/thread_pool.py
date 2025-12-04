@@ -2,7 +2,7 @@
 # =============== 全局线程池 异步任务接口 ===============
 # =====================================================
 
-from PySide2.QtCore import QThreadPool, QRunnable
+from PySide6.QtCore import QThreadPool, QRunnable
 
 from umi_log import logger
 
