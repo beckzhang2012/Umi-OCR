@@ -39,6 +39,13 @@ Item {
                 + " `pdf, xps, epub, mobi, fb2, cbz`",
         },
         {
+            key: "DirectoryMonitor",
+            url: "TabPages/DirectoryMonitor.qml",
+            needController: true,
+            title: qsTr("目录监控"),
+            intro: qsTr("# 目录监控\n\n自动监控文件夹，一旦有新图片就按规则分配到不同的OCR任务里")
+        },
+        {
             key: "QRCode",
             needController: true,
             title: qsTr("二维码"),
