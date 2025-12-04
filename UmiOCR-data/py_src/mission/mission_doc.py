@@ -14,6 +14,7 @@ from umi_log import logger
 from .mission import Mission
 from .mission_ocr import MissionOCR
 from ..ocr.tbpu import getParser
+from ..tag_pages.PostProcessingRules import PostProcessingRules
 from ..ocr.tbpu import IgnoreArea
 from ..ocr.tbpu.parser_tools.paragraph_parse import word_separator  # 上下句间隔符
 
@@ -324,6 +325,21 @@ class _MissionDocClass(Mission):
         if msnInfo["tbpu"] and tbs:
             for tbpu in msnInfo["tbpu"]:
                 tbs = tbpu.run(tbs)
+        
+        # =============== 执行后处理规则 ===============
+        if tbs:
+            rules_manager = PostProcessingRules()
+            target = "batch_doc"
+            # 获取所有文本内容
+            full_text = ""
+            for block in tbs:
+                full_text += block['text'] + '\n'
+            # 执行后处理规则
+            processed_text = rules_manager.process_text(target, full_text)
+            # 更新文本块内容
+            tbs[0]['text'] = processed_text.rstrip('\n')
+            # 清空其他块
+            del tbs[1:]
 
         # =============== 组装结果字典 resDict ===============
         if errMsg:

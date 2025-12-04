@@ -10,6 +10,7 @@ from .parser_single_para import SinglePara
 from .parser_single_line import SingleLine
 from .parser_single_none import SingleNone
 from .parser_single_code import SingleCode
+from .parser_post_processing_rules import PostProcessingRulesParser
 
 # 排版解析
 Parser = {
@@ -21,12 +22,16 @@ Parser = {
     "single_line": SingleLine,  # 单栏-总是换行
     "single_none": SingleNone,  # 单栏-无换行
     "single_code": SingleCode,  # 单栏-代码段
+    "post_processing_rules": PostProcessingRulesParser,  # 后处理规则
 }
 
 
 # 获取排版解析器对象
-def getParser(key):
+def getParser(key, target=None):
     if key in Parser:
-        return Parser[key]()
+        if key == "post_processing_rules" and target:
+            return Parser[key](target)
+        else:
+            return Parser[key]()
     else:
         return Parser["none"]()
