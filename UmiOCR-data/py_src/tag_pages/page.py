@@ -4,7 +4,8 @@
 
 from PySide2.QtCore import QObject
 
-from umi_log import logger
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Page(QObject):
