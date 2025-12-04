@@ -195,7 +195,7 @@ def run_ocr_task(task_id, image_path):
             logger.debug(f"任务 {msn_info['msnID']} - {msn['path']} 完成，耗时: {res.get('time', 0):.2f}秒")
             
             # 检查OCR结果
-            if res and res.get('code') == 0:
+            if res and res.get('code') == 100:
                 text = res.get('text', '')
                 if text.strip():
                     task_success = True
