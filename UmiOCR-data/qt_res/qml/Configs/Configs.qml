@@ -910,7 +910,7 @@ Item {
                 value(curr)
             }
 
-            ComboBox {
+            ComboBox_ {
                 id: comboBox
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -959,7 +959,7 @@ Item {
                     }
                 }
                 // 选项
-                delegate: ItemDelegate {
+                delegate: ItemDelegate_ {
                     width: comboBox.width
                     height: size_.line + size_.spacing
                     Text {

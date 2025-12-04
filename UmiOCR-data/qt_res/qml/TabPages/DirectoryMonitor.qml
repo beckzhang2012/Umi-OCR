@@ -495,7 +495,7 @@ Component {
             spacing: 10
             padding: 10
             
-            TextField {
+            TextField_ {
                 Layout.fillWidth: true
                 placeholderText: qsTr("监控项名称")
                 text: dialog.monitor.name
@@ -508,7 +508,7 @@ Component {
                 Layout.fillWidth: true
                 spacing: 10
                 
-                TextField {
+                TextField_ {
                     Layout.fillWidth: true
                     placeholderText: qsTr("监控目录")
                     text: dialog.monitor.directory
@@ -532,7 +532,7 @@ Component {
                 }
             }
             
-            TextField {
+            TextField_ {
                 Layout.fillWidth: true
                 placeholderText: qsTr("文件类型（逗号分隔，如：*.png,*.jpg）")
                 text: dialog.monitor.file_types.join(",")
@@ -545,7 +545,7 @@ Component {
                 Layout.fillWidth: true
                 spacing: 10
                 
-                TextField {
+                TextField_ {
                     Layout.fillWidth: true
                     placeholderText: qsTr("轮询间隔（秒）")
                     text: dialog.monitor.poll_interval.toString()
@@ -636,7 +636,7 @@ Component {
                 }
             }
             
-            TextField {
+            TextField_ {
                 Layout.fillWidth: true
                 placeholderText: qsTr("模式")
                 text: dialog.rule.pattern
@@ -645,7 +645,7 @@ Component {
                 }
             }
             
-            TextField {
+            TextField_ {
                 Layout.fillWidth: true
                 placeholderText: qsTr("OCR模板")
                 text: dialog.rule.template
@@ -658,7 +658,7 @@ Component {
                 Layout.fillWidth: true
                 spacing: 10
                 
-                TextField {
+                TextField_ {
                     Layout.fillWidth: true
                     placeholderText: qsTr("输出目录")
                     text: dialog.rule.output_dir
@@ -682,7 +682,7 @@ Component {
                 }
             }
             
-            TextField {
+            TextField_ {
                 Layout.fillWidth: true
                 placeholderText: qsTr("优先级")
                 text: dialog.rule.priority.toString()
