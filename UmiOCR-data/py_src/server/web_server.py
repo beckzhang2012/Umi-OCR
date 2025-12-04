@@ -3,13 +3,13 @@
 # ======= http接口可复用于跨进程命令行、防止多开等方面 ========
 # =========================================================
 
-from PySide2.QtCore import QThreadPool, QRunnable
+from PySide6.QtCore import QThreadPool, QRunnable
 from wsgiref.simple_server import make_server, WSGIServer
 
 from umi_log import logger
 from ..utils import pre_configs
 from ..utils.call_func import CallFunc
-from .bottle import Bottle, ServerAdapter, request, HTTPResponse, response, BaseRequest
+from bottle import Bottle, ServerAdapter, request, HTTPResponse, response, BaseRequest
 from .cmd_server import CmdServer
 from . import ocr_server
 from . import qrcode_server

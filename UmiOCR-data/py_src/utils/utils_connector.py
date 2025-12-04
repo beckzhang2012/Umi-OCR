@@ -1,7 +1,7 @@
 # 通用工具连接器
 
 from typing import List
-from PySide2.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot
 
 from . import utils
 from . import file_finder  # 文件搜索器

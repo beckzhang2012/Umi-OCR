@@ -1,7 +1,7 @@
 # 软件渲染选项
 
-from PySide2.QtGui import QGuiApplication, QOpenGLContext
-from PySide2.QtCore import Qt
+from PySide6.QtGui import QGuiApplication, QOpenGLContext
+from PySide6.QtCore import Qt
 import os
 
 from umi_log import logger

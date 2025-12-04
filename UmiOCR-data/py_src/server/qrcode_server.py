@@ -2,7 +2,7 @@ import json
 import base64
 from io import BytesIO
 
-from .bottle import request
+from bottle import request
 from ..mission.mission_qrcode import MissionQRCode
 
 

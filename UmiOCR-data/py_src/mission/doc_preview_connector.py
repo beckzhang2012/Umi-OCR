@@ -2,8 +2,8 @@
 # =============== 文档预览 - 连接器 ===============
 # ===============================================
 
-from PySide2.QtCore import QObject, Slot, Signal
-from PySide2.QtGui import QPixmap, QImage
+from PySide6.QtCore import QObject, Slot, Signal
+from PySide6.QtGui import QPixmap, QImage
 import fitz  # PyMuPDF
 
 from umi_log import logger

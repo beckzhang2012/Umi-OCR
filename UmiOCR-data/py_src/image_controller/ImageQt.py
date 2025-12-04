@@ -21,8 +21,8 @@ from io import BytesIO
 
 from PIL import Image
 
-from PySide2.QtCore import QBuffer, QIODevice
-from PySide2.QtGui import QImage, QPixmap, qRgba
+from PySide6.QtCore import QBuffer, QIODevice
+from PySide6.QtGui import QImage, QPixmap, qRgba
 
 qt_is_installed = True
 qt_version = None

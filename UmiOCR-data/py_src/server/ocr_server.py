@@ -1,6 +1,6 @@
 import json
 
-from .bottle import request
+from bottle import request
 from ..mission.mission_ocr import MissionOCR
 from ..utils.utils import initConfigDict
 from ..ocr.output.tools import getDataText
