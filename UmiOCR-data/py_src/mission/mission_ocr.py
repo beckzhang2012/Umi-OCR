@@ -65,53 +65,86 @@ class __MissionOcrClass(Mission):
         return super().addMissionList(msnInfo, msnList)
 
     def msnPreTask(self, msnInfo):  # 用于更新api和参数
-        # 检查API对象
-        if not self._api:
-            return "[Error] MissionOCR: API object is None."
-        # 检查参数更新
-        startInfo = self._dictShortKey(msnInfo["argd"])
-        # 恢复int类型
-        argdIntConvert(startInfo)
-        msg = self._api.start(startInfo)
-        if msg.startswith("[Error]"):
-            logger.error(f"OCR引擎启动失败： {msg}")
-            return msg  # 更新失败，结束该队列
-        else:
-            return ""  # 更新成功 TODO: continue
+        try:
+            # 检查API对象
+            if not self._api:
+                logger.error("OCR引擎API对象为空")
+                return "[Error] MissionOCR: API object is None."
+            
+            # 检查参数更新
+            startInfo = self._dictShortKey(msnInfo["argd"])
+            # 恢复int类型
+            argdIntConvert(startInfo)
+            
+            logger.debug(f"OCR引擎启动参数: {startInfo}")
+            msg = self._api.start(startInfo)
+            
+            if msg.startswith("[Error]"):
+                logger.error(f"OCR引擎启动失败： {msg}")
+                return msg  # 更新失败，结束该队列
+            else:
+                logger.debug("OCR引擎启动成功")
+                return ""  # 更新成功
+        except Exception as e:
+            logger.error(f"OCR任务前处理异常: {str(e)}", exc_info=True)
+            return f"[Error] OCR任务前处理异常: {str(e)}"
 
     def msnTask(self, msnInfo, msn):  # 执行msn
-        if "path" in msn:
-            res = self._api.runPath(msn["path"])
-            res["path"] = msn["path"]  # 结果字典中补充参数
-        elif "bytes" in msn:
-            res = self._api.runBytes(msn["bytes"])
-        elif "base64" in msn:
-            res = self._api.runBase64(msn["base64"])
-        else:
-            res = {
-                "code": 901,
-                "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+        try:
+            logger.debug(f"开始执行OCR任务: {msn}")
+            
+            if "path" in msn:
+                logger.debug(f"OCR任务路径: {msn['path']}")
+                res = self._api.runPath(msn["path"])
+                res["path"] = msn["path"]  # 结果字典中补充参数
+            elif "bytes" in msn:
+                logger.debug("OCR任务类型: bytes")
+                res = self._api.runBytes(msn["bytes"])
+            elif "base64" in msn:
+                logger.debug("OCR任务类型: base64")
+                res = self._api.runBase64(msn["base64"])
+            else:
+                logger.error(f"未知的OCR任务类型: {msn}")
+                res = {
+                    "code": 901,
+                    "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+                }
+            
+            # 任务成功时的后处理
+            if res["code"] == 100:
+                logger.debug(f"OCR任务成功，结果数量: {len(res['data'])}")
+                
+                # 计算平均置信度
+                score, num = 0, 0
+                for r in res["data"]:
+                    score += r["score"]
+                    num += 1
+                if num > 0:
+                    score /= num
+                    res["score"] = score
+                    logger.debug(f"OCR任务平均置信度: {score:.2f}")
+                
+                # 执行 tbpu
+                if msnInfo["tbpu"]:
+                    logger.debug(f"开始执行TBPU处理，模块数量: {len(msnInfo['tbpu'])}")
+                    for tbpu in msnInfo["tbpu"]:
+                        res["data"] = tbpu.run(res["data"])
+                        # 如果忽略区域等处理将所有文本删除，则结束tbpu
+                        if not res["data"]:
+                            res["code"] = 101
+                            res["data"] = ""
+                            logger.debug("TBPU处理删除了所有文本")
+                            break
+            else:
+                logger.warning(f"OCR任务执行失败，错误码: {res['code']}, 错误信息: {res.get('data', '无')}")
+            
+            return res
+        except Exception as e:
+            logger.error(f"OCR任务执行异常: {str(e)}", exc_info=True)
+            return {
+                "code": 902,
+                "data": f"[Error] OCR任务执行异常: {str(e)}",
             }
-        # 任务成功时的后处理
-        if res["code"] == 100:
-            # 计算平均置信度
-            score, num = 0, 0
-            for r in res["data"]:
-                score += r["score"]
-                num += 1
-            if num > 0:
-                score /= num
-            res["score"] = score
-            # 执行 tbpu
-            if msnInfo["tbpu"]:
-                for tbpu in msnInfo["tbpu"]:
-                    res["data"] = tbpu.run(res["data"])
-                    # 如果忽略区域等处理将所有文本删除，则结束tbpu
-                    if not res["data"]:
-                        res["code"] = 101
-                        res["data"] = ""
-                        break
-        return res
 
     # ========================= 【qml接口】 =========================
 
@@ -151,7 +184,8 @@ class __MissionOcrClass(Mission):
                 newD[k[len(key2) :]] = d[k]
             elif k.startswith(key1):
                 newD[k[len(key1) :]] = d[k]
-        return newD
+        # 如果没有找到匹配的键，直接返回原始字典
+        return newD if newD else d
 
     # ========================= 【qml接口】 =========================
 
