@@ -43,7 +43,13 @@ Item {
             needController: true,
             title: qsTr("二维码"),
             intro: qsTr("# 二维码\n\n识别或生成二维码、条形码。\n\n支持协议：")
-                + " `Aztec, Codabar, Code128, Code39, Code93, DataBar, DataBarExpanded, DataMatrix, EAN13, EAN8, ITF, LinearCodes, MatrixCodes, MaxiCode, MicroQRCode, PDF417, QRCode, UPCA, UPCE`",
+                + " `Aztec, Codabar, Code128, Code39, Code93, DataBar, DataBarExpanded, DataMatrix, EAN13, EAN8, ITF, LinearCodes, MatrixCodes, MaxiCode, MicroQRCode, PDF417, QRCode, UPCA, UPCE`,",
+        },
+        {
+            key: "ReviewBoard",
+            needController: true,
+            title: qsTr("审阅看板"),
+            intro: qsTr("# 审阅看板\n\n集中管理OCR识别记录，支持状态标记、负责人分配和批量操作。")
         },
         {
             key: "GlobalConfigsPage",
