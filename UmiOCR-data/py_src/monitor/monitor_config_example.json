@@ -1,0 +1,56 @@
+{
+  "monitor_items": [
+    {
+      "id": "monitor_1234567890",
+      "directory": "D:\\监控目录1",
+      "file_types": [".jpg", ".jpeg", ".png", ".bmp"],
+      "polling_interval": 60,
+      "recursive_level": 0,
+      "enabled": true,
+      "created_at": "2024-01-01 12:00:00",
+      "updated_at": "2024-01-01 12:00:00"
+    },
+    {
+      "id": "monitor_1234567891",
+      "directory": "D:\\监控目录2",
+      "file_types": [".jpg", ".png"],
+      "polling_interval": 300,
+      "recursive_level": 1,
+      "enabled": true,
+      "created_at": "2024-01-01 12:00:00",
+      "updated_at": "2024-01-01 12:00:00"
+    }
+  ],
+  "routing_rules": [
+    {
+      "id": "rule_1234567890",
+      "filename_regex": "^\d{8}.*$",
+      "min_size": 0,
+      "max_size": 10485760,
+      "min_modified_time": 0,
+      "max_modified_time": 0,
+      "ocr_params": {
+        "template": "模板1",
+        "output_dir": "D:\\输出目录1"
+      },
+      "enabled": true,
+      "created_at": "2024-01-01 12:00:00",
+      "updated_at": "2024-01-01 12:00:00"
+    },
+    {
+      "id": "rule_1234567891",
+      "filename_regex": "^.*_result.*$",
+      "min_size": 1024,
+      "max_size": 52428800,
+      "min_modified_time": 0,
+      "max_modified_time": 0,
+      "ocr_params": {
+        "template": "模板2",
+        "output_dir": "D:\\输出目录2"
+      },
+      "enabled": true,
+      "created_at": "2024-01-01 12:00:00",
+      "updated_at": "2024-01-01 12:00:00"
+    }
+  ]
+}

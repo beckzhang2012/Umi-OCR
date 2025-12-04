@@ -3,17 +3,17 @@
 # =============================================
 
 
-from PySide2.QtCore import QMutex
-from ..utils.thread_pool import threadRun  # 异步执行函数
+from threading import Lock
+from utils.thread_pool import threadRun  # 异步执行函数
 
 
 class SimpleMission:
     def __init__(self, msnTask):
         self._msnTask = msnTask  # 任务函数
         self._msnList = []  # 任务队列
-        self._msnMutex = QMutex()  # 任务队列的锁
+        self._msnMutex = Lock()  # 任务队列的锁
         self._task = None  # 异步任务对象
-        self._taskMutex = QMutex()  # 任务对象的锁
+        self._taskMutex = Lock()  # 任务对象的锁
 
     def addMissionList(self, msnList):  # 添加一条任务队列，返回任务ID
         if len(msnList) < 1:

@@ -4,14 +4,10 @@
 
 import re
 import os
-from PySide2.QtGui import QClipboard
-from PySide2.QtCore import QFileInfo
-from PySide2.QtQml import QJSValue
+import pyperclip  # 剪贴板操作
 from urllib.parse import unquote  # 路径解码
 
 from umi_log import logger
-
-Clipboard = QClipboard()  # 剪贴板
 
 
 # 传入文件名，检测是否含非法字符。没问题返回True
@@ -25,17 +21,18 @@ def allowedFileName(fn):
 
 # 复制文本到剪贴板
 def copyText(text):
-    Clipboard.setText(text)
+    pyperclip.copy(text)
 
 
-# QUrl列表 转 String列表
-def QUrl2String(urls):
+# 文件路径列表处理
+def processFilePaths(paths):
     resList = []
-    for url in urls:
-        if url.isLocalFile():
-            u = unquote(url.toLocalFile())  # 解码路径
-            if QFileInfo(u).exists():  # 检查路径是否真的存在
-                resList.append(u)
+    for path in paths:
+        # 解码路径
+        u = unquote(path)
+        # 检查路径是否真的存在
+        if os.path.exists(u):
+            resList.append(u)
     return resList
 
 

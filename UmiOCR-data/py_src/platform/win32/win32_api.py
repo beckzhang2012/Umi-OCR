@@ -4,7 +4,8 @@
 
 import os
 import subprocess
-from PySide2.QtCore import QStandardPaths as Qsp, QFile, QFileInfo
+import winshell  # Windows快捷方式操作
+from pathlib import Path
 
 from umi_log import logger
 from umi_about import UmiAbout
@@ -22,7 +23,7 @@ class _Shortcut:
     def _getPath(position):
         # 桌面
         if position == "desktop":
-            return Qsp.writableLocation(Qsp.DesktopLocation)
+            return winshell.desktop()
 
         startMenu = os.path.join(
             os.getenv(EnvType), "Microsoft", "Windows", "Start Menu"
@@ -32,7 +33,7 @@ class _Shortcut:
             return startMenu
         # 开机自启
         elif position == "startup":
-            return os.path.join(startMenu, "Programs", "Startup")
+            return winshell.startup()
 
     # 创建快捷方式，返回成功与否的字符串。position取值：
     # desktop 桌面
@@ -51,11 +52,14 @@ class _Shortcut:
         while os.path.exists(lnkPath):  # 快捷方式已存在
             lnkPath = lnkPathBase + f" ({i}).lnk"  # 添加序号
             i += 1
-        appFile = QFile(appPath)
-        res = appFile.link(lnkPath)
-        if not res:
-            return f"[Error] {appFile.errorString()}\n请尝试以管理员权限启动软件。\nPlease try starting the software as an administrator.\nappPath: {appPath}\nlnkPath: {lnkPath}"
-        return "[Success]"
+        try:
+            with winshell.shortcut(lnkPath) as shortcut:
+                shortcut.path = appPath
+                shortcut.working_directory = os.path.dirname(appPath)
+                shortcut.description = UmiAbout["name"]
+            return "[Success]"
+        except Exception as e:
+            return f"[Error] {str(e)}\n请尝试以管理员权限启动软件。\nPlease try starting the software as an administrator.\nappPath: {appPath}\nlnkPath: {lnkPath}"
 
     # 删除快捷方式，返回删除文件的个数
     @staticmethod
@@ -64,24 +68,21 @@ class _Shortcut:
         lnkDir = _Shortcut._getPath(position)
         num = 0
         for fileName in os.listdir(lnkDir):
-            lnkPath = os.path.join(lnkDir, fileName)
-            try:
-                if not os.path.isfile(lnkPath):  # 排除非文件
+            if fileName.endswith(".lnk"):
+                lnkPath = os.path.join(lnkDir, fileName)
+                try:
+                    # 检查快捷方式是否指向当前应用
+                    with winshell.shortcut(lnkPath) as shortcut:
+                        if lnkName in os.path.basename(shortcut.path):
+                            os.remove(lnkPath)
+                            num += 1
+                except Exception:
+                    logger.error(
+                        f"删除快捷方式失败。 lnkPath: {lnkPath}",
+                        exc_info=True,
+                        stack_info=True,
+                    )
                     continue
-                info = QFileInfo(lnkPath)
-                if not info.isSymLink():  # 排除非快捷方式
-                    continue
-                originName = os.path.basename(info.symLinkTarget())
-                if lnkName in originName:  # 快捷方式指向的文件名包含appName，删之
-                    os.remove(lnkPath)
-                    num += 1
-            except Exception:
-                logger.error(
-                    f"删除快捷方式失败。 lnkPath: {lnkPath}",
-                    exc_info=True,
-                    stack_info=True,
-                )
-                continue
         return num
 
 

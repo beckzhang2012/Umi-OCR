@@ -12,9 +12,9 @@ import os
 
 from umi_log import logger
 from .mission import Mission
-from ..ocr.tbpu import getParser, IgnoreArea
-from ..ocr.api import getApiOcr, getLocalOptions
-from ..utils.utils import argdIntConvert
+from ocr.tbpu import getParser, IgnoreArea
+from ocr.api import getApiOcr, getLocalOptions
+from utils.utils import argdIntConvert
 
 # 合法文件后缀
 ImageSuf = [

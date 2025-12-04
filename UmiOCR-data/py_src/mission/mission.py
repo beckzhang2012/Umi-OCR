@@ -3,13 +3,13 @@
 # ==============================================
 
 
-from PySide2.QtCore import QMutex, QRunnable
+from threading import Lock
 from threading import Condition
 from uuid import uuid4  # 唯一ID
 import time
 
 from umi_log import logger
-from ..utils.thread_pool import threadRun  # 异步执行函数
+from utils.thread_pool import threadRun  # 异步执行函数
 
 
 class Mission:
@@ -17,9 +17,9 @@ class Mission:
         self._msnInfoDict = {}  # 任务信息的字典
         self._msnListDict = {}  # 任务队列的字典
         self._msnPausedDict = {}  # 已暂停的任务队列
-        self._msnMutex = QMutex()  # 任务队列的锁
+        self._msnMutex = Lock()  # 任务队列的锁
         self._task = None  # 异步任务对象
-        self._taskMutex = QMutex()  # 任务对象的锁
+        self._taskMutex = Lock()  # 任务对象的锁
         # 任务队列调度方式
         # 1111 : 轮询调度，轮流取每个队列的第1个任务
         # 1234 : 顺序调度，将首个队列所有任务处理完，再进入下一个队列
