@@ -90,6 +90,7 @@ def runQml(engineAddImportPath):
     from .image_controller.image_connector import ImageConnector  # 图片处理连接器
     from .image_controller.image_provider import PixmapProvider  # 图片提供器
     from .utils.i18n_configs import I18n  # 语言
+    from .post_processing.post_processing import PostProcessingManagerInstance  # 后处理规则
 
     qmlRegisterType(TagPageConnector, "TagPageConnector", 1, 0, "TagPageConnector")
     qmlRegisterType(MissionConnector, "MissionConnector", 1, 0, "MissionConnector")
@@ -108,6 +109,9 @@ def runQml(engineAddImportPath):
 
     # ==================== 5. 启动翻译 ====================
     I18n.init(qtApp)
+    
+    # ==================== 6. 初始化后处理规则模块 ====================
+    PostProcessingManagerInstance.load_config()
 
     # ==================== 6. 启动qml引擎 ====================
     engine = QQmlApplicationEngine()
@@ -148,5 +152,6 @@ def main(app_path, engineAddImportPath=""):
     pre_configs.readConfigs()  # 初始化预配置项
     if not initCmd():  # 初始化命令行，如果已有Umi-OCR在运行则结束运行
         sys.exit(0)
+
     runQml(engineAddImportPath)  # 启动qml
     sys.exit(0)
