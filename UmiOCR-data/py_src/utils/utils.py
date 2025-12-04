@@ -9,7 +9,8 @@ from PySide2.QtCore import QFileInfo
 from PySide2.QtQml import QJSValue
 from urllib.parse import unquote  # 路径解码
 
-from umi_log import logger
+import logging
+logger = logging.getLogger(__name__)
 
 Clipboard = QClipboard()  # 剪贴板
 
