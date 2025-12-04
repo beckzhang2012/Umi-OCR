@@ -35,6 +35,8 @@ class __MissionOcrClass(Mission):
         super().__init__()
         self._apiKey = ""  # 当前api类型
         self._api = None  # 当前引擎api对象
+        self._apiMutex = QMutex()  # API对象的原子操作锁
+        self._threadId = None  # 当前执行任务的线程ID
 
     # ========================= 【重载】 =========================
 
@@ -65,53 +67,110 @@ class __MissionOcrClass(Mission):
         return super().addMissionList(msnInfo, msnList)
 
     def msnPreTask(self, msnInfo):  # 用于更新api和参数
-        # 检查API对象
-        if not self._api:
-            return "[Error] MissionOCR: API object is None."
-        # 检查参数更新
-        startInfo = self._dictShortKey(msnInfo["argd"])
-        # 恢复int类型
-        argdIntConvert(startInfo)
-        msg = self._api.start(startInfo)
-        if msg.startswith("[Error]"):
-            logger.error(f"OCR引擎启动失败： {msg}")
-            return msg  # 更新失败，结束该队列
-        else:
-            return ""  # 更新成功 TODO: continue
+        try:
+            # 原子检查API对象
+            self._apiMutex.lock()
+            if not self._api:
+                logger.error("MissionOCR: API object is None.")
+                self._apiMutex.unlock()
+                return "[Error] MissionOCR: API object is None."
+            self._apiMutex.unlock()
+
+            # 检查参数更新
+            startInfo = self._dictShortKey(msnInfo["argd"])
+            # 恢复int类型
+            argdIntConvert(startInfo)
+
+            # 原子操作：启动/更新API
+            self._apiMutex.lock()
+            msg = self._api.start(startInfo)
+            self._apiMutex.unlock()
+
+            if msg.startswith("[Error]"):
+                logger.error(f"OCR引擎启动失败： {msg}")
+                return msg  # 更新失败，结束该队列
+            else:
+                # 记录当前线程ID
+                import threading
+                self._threadId = threading.current_thread().ident
+                logger.debug(f"OCR任务线程已绑定： {self._threadId}")
+                return ""  # 更新成功
+        except Exception as e:
+            logger.error(f"msnPreTask 异常： {str(e)}")
+            self._apiMutex.unlock()
+            return f"[Error] msnPreTask 异常： {str(e)}"
 
     def msnTask(self, msnInfo, msn):  # 执行msn
-        if "path" in msn:
-            res = self._api.runPath(msn["path"])
-            res["path"] = msn["path"]  # 结果字典中补充参数
-        elif "bytes" in msn:
-            res = self._api.runBytes(msn["bytes"])
-        elif "base64" in msn:
-            res = self._api.runBase64(msn["base64"])
-        else:
-            res = {
-                "code": 901,
-                "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+        try:
+            logger.debug(f"开始执行OCR任务： {msn}")
+            
+            # 原子检查API对象是否有效
+            self._apiMutex.lock()
+            if not self._api:
+                logger.error("MissionOCR: API object is None during task execution.")
+                self._apiMutex.unlock()
+                return {
+                    "code": 902,
+                    "data": "[Error] API object is None during task execution.\n【异常】任务执行时API对象为空。",
+                }
+            self._apiMutex.unlock()
+
+            # 执行OCR任务
+            if "path" in msn:
+                logger.debug(f"执行路径OCR任务： {msn['path']}")
+                res = self._api.runPath(msn["path"])
+                res["path"] = msn["path"]  # 结果字典中补充参数
+            elif "bytes" in msn:
+                logger.debug(f"执行字节OCR任务，数据长度： {len(msn['bytes'])}")
+                res = self._api.runBytes(msn["bytes"])
+            elif "base64" in msn:
+                logger.debug(f"执行Base64 OCR任务，数据长度： {len(msn['base64'])}")
+                res = self._api.runBase64(msn["base64"])
+            else:
+                logger.error(f"未知的任务类型： {str(msn)[:100]}")
+                res = {
+                    "code": 901,
+                    "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+                }
+
+            # 任务成功时的后处理
+            if res["code"] == 100:
+                logger.debug(f"OCR任务执行成功，结果数量： {len(res['data'])}")
+                
+                # 计算平均置信度
+                score, num = 0, 0
+                for r in res["data"]:
+                    score += r["score"]
+                    num += 1
+                if num > 0:
+                    score /= num
+                res["score"] = score
+                logger.debug(f"OCR任务平均置信度： {score}")
+
+                # 执行 tbpu
+                if msnInfo["tbpu"]:
+                    logger.debug(f"开始执行TBPU后处理，处理数量： {len(msnInfo['tbpu'])}")
+                    for tbpu in msnInfo["tbpu"]:
+                        res["data"] = tbpu.run(res["data"])
+                        # 如果忽略区域等处理将所有文本删除，则结束tbpu
+                        if not res["data"]:
+                            res["code"] = 101
+                            res["data"] = ""
+                            logger.debug(f"TBPU后处理删除了所有文本")
+                            break
+                    logger.debug(f"TBPU后处理完成，结果数量： {len(res['data'])}")
+            else:
+                logger.error(f"OCR任务执行失败，错误码： {res['code']}，错误信息： {res['data']}")
+
+            return res
+        except Exception as e:
+            logger.error(f"msnTask 异常： {str(e)}")
+            import traceback
+            logger.error(f"异常堆栈： {traceback.format_exc()}")
+            return {
+                "code": 903,
+                "data": f"[Error] Task execution exception.\n【异常】任务执行异常。\n{str(e)}",
             }
-        # 任务成功时的后处理
-        if res["code"] == 100:
-            # 计算平均置信度
-            score, num = 0, 0
-            for r in res["data"]:
-                score += r["score"]
-                num += 1
-            if num > 0:
-                score /= num
-            res["score"] = score
-            # 执行 tbpu
-            if msnInfo["tbpu"]:
-                for tbpu in msnInfo["tbpu"]:
-                    res["data"] = tbpu.run(res["data"])
-                    # 如果忽略区域等处理将所有文本删除，则结束tbpu
-                    if not res["data"]:
-                        res["code"] = 101
-                        res["data"] = ""
-                        break
-        return res
 
     # ========================= 【qml接口】 =========================
 
@@ -123,22 +182,39 @@ class __MissionOcrClass(Mission):
 
     def setApi(self, apiKey, info):  # 设置api
         # 成功返回 [Success] ，失败返回 [Error] 开头的字符串
-        self._apiKey = apiKey
-        info = self._dictShortKey(info)
-        # 如果api对象已启动，则先停止
-        if self._api:
-            self._api.stop()
-        # 获取新api对象
-        res = getApiOcr(apiKey, info)
-        # 失败
-        if isinstance(res, str):
-            self._apiKey = ""
-            self._api = None
-            return res
-        # 成功
-        else:
-            self._api = res
-            return "[Success]"
+        try:
+            self._apiMutex.lock()
+            
+            # 如果api对象已启动，则先停止
+            if self._api:
+                logger.debug(f"停止当前API： {self._apiKey}")
+                self._api.stop()
+                self._api = None
+            
+            self._apiKey = apiKey
+            info = self._dictShortKey(info)
+            
+            # 获取新api对象
+            logger.debug(f"尝试获取新API： {apiKey}")
+            res = getApiOcr(apiKey, info)
+            
+            # 失败
+            if isinstance(res, str):
+                logger.error(f"获取API失败： {res}")
+                self._apiKey = ""
+                self._api = None
+                self._apiMutex.unlock()
+                return res
+            # 成功
+            else:
+                self._api = res
+                logger.debug(f"API设置成功： {apiKey}")
+                self._apiMutex.unlock()
+                return "[Success]"
+        except Exception as e:
+            logger.error(f"setApi 异常： {str(e)}")
+            self._apiMutex.unlock()
+            return f"[Error] setApi 异常： {str(e)}"
 
     # 将字典中配置项的长key转为短key
     # 如： ocr.win32_PaddleOCR-json.path → path
