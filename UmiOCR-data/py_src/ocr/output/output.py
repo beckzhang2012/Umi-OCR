@@ -3,6 +3,7 @@
 from .tools import getDataText
 from ...platform import Platform
 import os
+from ...utils.file_writer import file_writer
 
 
 class Output:

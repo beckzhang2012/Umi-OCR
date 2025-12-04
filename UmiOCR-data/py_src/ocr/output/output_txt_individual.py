@@ -3,6 +3,7 @@
 import os
 from .output import Output
 from .tools import getDataText
+from ...utils.file_writer import file_writer
 
 
 class OutputTxtIndividual(Output):
@@ -31,5 +32,8 @@ class OutputTxtIndividual(Output):
         else:  # 输出到指定路径
             f, _ = os.path.splitext(res["fileName"])  # 原文件名去除扩展名
             path = f"{self.dir}/{f}.txt"
-        with open(path, "w", encoding="utf-8") as f:  # 追加写入同名本地文件
-            f.write(textOut)
+        # 使用增强型文件写入工具写入文件
+        file_writer.write_file(path, textOut, mode='w', encoding='utf-8')
+        # 尝试处理缓存队列
+        if file_writer.get_queue_size() > 0:
+            file_writer.process_queue()

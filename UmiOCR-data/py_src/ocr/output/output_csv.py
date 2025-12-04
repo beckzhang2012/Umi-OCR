@@ -5,6 +5,7 @@ import csv
 from umi_log import logger
 from .output import Output
 from .tools import getDataText
+from ...utils.file_writer import file_writer
 
 
 class OutputCsv(Output):
@@ -24,11 +25,9 @@ class OutputCsv(Output):
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
         self.writeLists = []  # 输出内容列表
         self.writeText = ""  # 输出内容字符串
-        try:  # 覆盖创建临时文件
-            with open(self.outputPath, "w", encoding="utf-8") as f:
-                pass
-        except Exception as e:
-            raise Exception(f"Failed to create csv file. {e}\n创建csv文件失败。")
+        # 覆盖创建临时文件
+        if not file_writer.create_file(self.outputPath):
+            raise Exception(f"Failed to create csv file.\n创建csv文件失败。")
 
     def print(self, res):  # 输出图片结果
         if not res["code"] == 100 and self.ignoreBlank:
@@ -59,12 +58,13 @@ class OutputCsv(Output):
         # 创建文件、输出
         headers = ["Name", "OCR", "Path"]  # 表头
         try:
-            with open(
-                self.outputPath, "w", encoding=encoding, newline=""
-            ) as f:  # 覆盖创建文件
-                writer = csv.writer(f)
-                writer.writerow(headers)  # 写入CSV表头
-                for writeList in self.writeLists:
-                    writer.writerow(writeList)  # 写入CSV内容
-        except Exception as e:
-            raise Exception(f"Failed to write csv file. {e}\n写入csv文件失败。")
+            # 使用增强型文件写入工具写入CSV内容
+            content = ''
+            # 写入表头
+            content += ','.join(headers) + '\n'
+            # 写入内容
+            for writeList in self.writeLists:
+                # CSV转义：处理包含逗号、引号的字段
+                escaped = []
+                for item in writeList:
+                    if ',' in item or '

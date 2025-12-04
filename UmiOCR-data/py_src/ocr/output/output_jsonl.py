@@ -1,6 +1,7 @@
 # 输出到jsonl文件
 
 from .output import Output
+from ...utils.file_writer import file_writer
 
 import json
 
@@ -12,13 +13,14 @@ class OutputJsonl(Output):
         self.outputPath = f"{self.dir}/{self.fileName}.jsonl"  # 输出路径
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
         # 创建输出文件
-        try:
-            with open(self.outputPath, "w", encoding="utf-8") as f:  # 覆盖创建文件
-                pass
-        except Exception as e:
-            raise Exception(f"Failed to create jsonl file. {e}\n创建jsonl文件失败。")
+        if not file_writer.create_file(self.outputPath):
+            raise Exception(f"Failed to create jsonl file.\n创建jsonl文件失败。")
 
     def print(self, res):  # 输出图片结果
         # 不忽略空白条目
-        with open(self.outputPath, "a", encoding="utf-8") as f:  # 追加写入本地文件
-            f.write(json.dumps(res, ensure_ascii=False) + "\n")
+        content = json.dumps(res, ensure_ascii=False) + "\n"
+        file_writer.write_file(self.outputPath, content, mode='a', encoding='utf-8')
+        
+        # 尝试处理缓存队列
+        if file_writer.get_queue_size() > 0:
+            file_writer.process_queue()
