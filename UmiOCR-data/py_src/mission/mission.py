@@ -4,9 +4,10 @@
 
 
 from PySide2.QtCore import QMutex, QRunnable
-from threading import Condition
+from threading import Condition, Lock
 from uuid import uuid4  # 唯一ID
 import time
+import copy
 
 from umi_log import logger
 from ..utils.thread_pool import threadRun  # 异步执行函数
@@ -20,10 +21,13 @@ class Mission:
         self._msnMutex = QMutex()  # 任务队列的锁
         self._task = None  # 异步任务对象
         self._taskMutex = QMutex()  # 任务对象的锁
+        self._taskLock = Lock()  # 任务执行锁，确保原子性
         # 任务队列调度方式
         # 1111 : 轮询调度，轮流取每个队列的第1个任务
         # 1234 : 顺序调度，将首个队列所有任务处理完，再进入下一个队列
         self._schedulingMode = "1111"
+        # 任务恢复信息
+        self._recoveryInfo = {}  # key: msnID, value: (snapshot, lastIndex)
 
     # ========================= 【调用接口】 =========================
 
@@ -191,79 +195,133 @@ class Mission:
         dictIndex = 0  # 当前取任务字典中的第几个任务队列
         # 循环，直到任务队列的列表为空
         while True:
-            # 1. 检查api和任务字典是否为空
-            self._msnMutex.lock()  # 锁1 上锁
-            dl = len(self._msnInfoDict)  # 任务字典长度
-            if dl == 0:  # 任务字典已空
-                self._msnMutex.unlock()  # 锁1 解锁
-                break
+            try:
+                with self._taskLock:
+                    # 1. 检查api和任务字典是否为空
+                    self._msnMutex.lock()  # 锁1 上锁
+                    dl = len(self._msnInfoDict)  # 任务字典长度
+                    if dl == 0:  # 任务字典已空
+                        self._msnMutex.unlock()  # 锁1 解锁
+                        break
 
-            # 2. 任务调度，取一个任务
-            if self._schedulingMode == "1111":  # 轮询
-                dictIndex = (dictIndex + 1) % dl
-            elif self._schedulingMode == "1234":  # 顺序
-                dictIndex = 0  # 始终为首个队列
-            dictKey = tuple(self._msnInfoDict.keys())[dictIndex]
-            msnInfo = self._msnInfoDict[dictKey]
-            msnList = self._msnListDict[dictKey]
-            self._msnMutex.unlock()  # 锁1 解锁
+                    # 2. 任务调度，取一个任务
+                    if self._schedulingMode == "1111":  # 轮询
+                        dictIndex = (dictIndex + 1) % dl
+                    elif self._schedulingMode == "1234":  # 顺序
+                        dictIndex = 0  # 始终为首个队列
+                    dictKey = tuple(self._msnInfoDict.keys())[dictIndex]
+                    
+                    # 3. 创建任务上下文快照
+                    msnInfo = copy.deepcopy(self._msnInfoDict[dictKey])
+                    msnList = copy.deepcopy(self._msnListDict[dictKey])
+                    snapshot = {"msnInfo": msnInfo, "msnList": msnList, "dictKey": dictKey}
+                    self._msnMutex.unlock()  # 锁1 解锁
 
-            # 3. 检查任务是否要求停止
-            if msnInfo["state"] == "stop":
-                self._msnDictDel(dictKey)
-                msnInfo["onEnd"](msnInfo, "[Warning] Task stop.")
-                continue
+                    # 4. 原子校验：检查任务状态和上下文一致性
+                    self._msnMutex.lock()
+                    current_msnInfo = self._msnInfoDict.get(dictKey)
+                    current_msnList = self._msnListDict.get(dictKey)
+                    is_consistent = (current_msnInfo is not None and 
+                                     current_msnList is not None and 
+                                     current_msnInfo["state"] == msnInfo["state"] and 
+                                     len(current_msnList) == len(msnList))
+                    self._msnMutex.unlock()
+                    
+                    if not is_consistent:
+                        logger.warning(f"任务上下文不一致，跳过本次执行: {dictKey}")
+                        continue
 
-            # 4. 前处理，检查、更新参数
-            preFlag = self.msnPreTask(msnInfo)
-            if preFlag == "continue":  # 跳过本次
-                logger.debug(f"任务跳过： {dictKey}")
-                continue
-            elif preFlag.startswith("[Error]"):  # 异常，结束该队列
-                msnInfo["onEnd"](msnInfo, preFlag)
-                self._msnDictDel(dictKey)
-                dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
-                continue
+                    # 5. 检查任务是否要求停止
+                    if msnInfo["state"] == "stop":
+                        self._msnDictDel(dictKey)
+                        msnInfo["onEnd"](msnInfo, "[Warning] Task stop.")
+                        continue
 
-            # 5. 首次任务
-            if msnInfo["state"] == "waiting":
-                msnInfo["state"] = "running"
-                msnInfo["onStart"](msnInfo)
+                    # 6. 前处理，检查、更新参数
+                    preFlag = self.msnPreTask(msnInfo)
+                    if preFlag == "continue":  # 跳过本次
+                        logger.debug(f"任务跳过： {dictKey}")
+                        continue
+                    elif preFlag.startswith("[Error]"):  # 异常，结束该队列
+                        msnInfo["onEnd"](msnInfo, preFlag)
+                        self._msnDictDel(dictKey)
+                        dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
+                        continue
 
-            # 6. 执行任务，并记录时间
-            msn = msnList[0]
-            msnInfo["onReady"](msnInfo, msn)
-            t1 = time.time()
-            res = self.msnTask(msnInfo, msn)
-            t2 = time.time()
-            if isinstance(res, dict):  # 补充耗时和时间戳
-                res["time"] = t2 - t1
-                res["timestamp"] = t2
+                    # 7. 首次任务
+                    if msnInfo["state"] == "waiting":
+                        # 更新任务状态为running
+                        self._msnMutex.lock()
+                        if dictKey in self._msnInfoDict:
+                            self._msnInfoDict[dictKey]["state"] = "running"
+                        self._msnMutex.unlock()
+                        msnInfo["state"] = "running"
+                        msnInfo["onStart"](msnInfo)
 
-            # 7. 再次检查任务是否要求停止，或者已暂停
-            self._msnMutex.lock()  # 锁2 上锁
-            if msnInfo["state"] == "stop":
-                self._msnDictDel(dictKey)
-                self._msnMutex.unlock()  # 锁2 解锁
-                msnInfo["onEnd"](msnInfo, "[Warning] Task stop.")
-                continue
-            if dictKey not in self._msnInfoDict:
-                self._msnMutex.unlock()  # 锁2 解锁
-                continue
+                    # 8. 执行任务，并记录时间
+                    if not msnList:
+                        logger.warning(f"任务列表为空: {dictKey}")
+                        continue
+                        
+                    msn = msnList[0]
+                    msnInfo["onReady"](msnInfo, msn)
+                    t1 = time.time()
+                    
+                    # 保存恢复信息
+                    self._recoveryInfo[dictKey] = (snapshot, 0)
+                    
+                    res = self.msnTask(msnInfo, msn)
+                    t2 = time.time()
+                    if isinstance(res, dict):  # 补充耗时和时间戳
+                        res["time"] = t2 - t1
+                        res["timestamp"] = t2
 
-            # 8. 不停止，则上报该任务
-            msnList.pop(0)  # 弹出该任务
-            self._msnMutex.unlock()  # 锁2 解锁
-            # 回调。注意：回调函数执行时间长时，可能用户再次提交了任务暂停，需要后续继续判断。
-            msnInfo["onGet"](msnInfo, msn, res)
+                    # 9. 再次检查任务是否要求停止，或者已暂停
+                    self._msnMutex.lock()  # 锁2 上锁
+                    if dictKey not in self._msnInfoDict:
+                        self._msnMutex.unlock()  # 锁2 解锁
+                        logger.warning(f"任务已被移除: {dictKey}")
+                        continue
+                        
+                    current_state = self._msnInfoDict[dictKey]["state"]
+                    if current_state == "stop":
+                        self._msnDictDel(dictKey)
+                        self._msnMutex.unlock()  # 锁2 解锁
+                        msnInfo["onEnd"](msnInfo, "[Warning] Task stop.")
+                        continue
+                    elif current_state == "paused":
+                        self._msnMutex.unlock()  # 锁2 解锁
+                        logger.debug(f"任务已暂停: {dictKey}")
+                        continue
 
-            # 9. 这条任务队列完成
-            if len(msnList) == 0:
-                msnInfo["onEnd"](msnInfo, "[Success]")
-                self._msnMutex.lock()  # 锁3 上锁
-                self._msnDictDel(dictKey)
-                self._msnMutex.unlock()  # 锁3 解锁
-                dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
+                    # 10. 不停止，则上报该任务并更新队列
+                    if len(self._msnListDict[dictKey]) > 0:
+                        self._msnListDict[dictKey].pop(0)  # 弹出该任务
+                    self._msnMutex.unlock()  # 锁2 解锁
+                    
+                    # 回调。注意：回调函数执行时间长时，可能用户再次提交了任务暂停，需要后续继续判断。
+                    msnInfo["onGet"](msnInfo, msn, res)
+
+                    # 11. 这条任务队列完成
+                    self._msnMutex.lock()
+                    remaining_tasks = len(self._msnListDict.get(dictKey, []))
+                    self._msnMutex.unlock()
+                    
+                    if remaining_tasks == 0:
+                        msnInfo["onEnd"](msnInfo, "[Success]")
+                        self._msnMutex.lock()  # 锁3 上锁
+                        self._msnDictDel(dictKey)
+                        self._msnMutex.unlock()  # 锁3 解锁
+                        dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
+                        # 清除恢复信息
+                        if dictKey in self._recoveryInfo:
+                            del self._recoveryInfo[dictKey]
+            except Exception as e:
+                logger.error(f"任务执行异常: {str(e)}", exc_info=True)
+                # 尝试自动恢复任务
+                self._recoverTask(dictKey, snapshot) if 'snapshot' in locals() else None
+                dictIndex = 0  # 重置索引，避免因索引错误导致的无限循环
+                time.sleep(1)  # 等待1秒后继续，避免频繁错误
 
         # 完成
         self._taskFinish()
@@ -282,6 +340,49 @@ class Mission:
         self._taskMutex.lock()  # 上锁
         self._task = None
         self._taskMutex.unlock()  # 解锁
+        logger.debug("任务线程已结束")
+        
+    def _recoverTask(self, dictKey, snapshot):
+        """自动恢复任务"""
+        try:
+            self._msnMutex.lock()
+            
+            # 检查任务是否已经被删除
+            if dictKey not in self._msnInfoDict:
+                logger.warning(f"任务已被删除，无法恢复: {dictKey}")
+                self._msnMutex.unlock()
+                return
+                
+            # 检查任务状态
+            current_state = self._msnInfoDict[dictKey]["state"]
+            if current_state == "stop":
+                logger.warning(f"任务已停止，无法恢复: {dictKey}")
+                self._msnMutex.unlock()
+                return
+                
+            # 从快照中恢复任务队列
+            recovered_msnList = snapshot["msnList"]
+            if len(recovered_msnList) > 0:
+                # 保留未完成的任务
+                self._msnListDict[dictKey] = recovered_msnList
+                
+                # 记录恢复过程到UI日志
+                msnInfo = snapshot["msnInfo"]
+                recovery_msg = f"[Warning] 任务执行异常，已自动恢复。继续处理剩余 {len(recovered_msnList)} 个任务。"
+                logger.warning(recovery_msg)
+                msnInfo["onEnd"](msnInfo, recovery_msg)
+                
+                # 重新启动任务线程
+                self._startMsns()
+                
+                logger.info(f"任务已恢复: {dictKey}")
+            else:
+                logger.warning(f"快照中没有未完成的任务: {dictKey}")
+                
+        except Exception as e:
+            logger.error(f"任务恢复失败: {str(e)}", exc_info=True)
+        finally:
+            self._msnMutex.unlock()
 
     # ========================= 【继承重载】 =========================
 
