@@ -2,6 +2,7 @@
 
 from .tools import getDataText
 from ...platform import Platform
+from ...utils.file_writer import SafeFileWriter
 import os
 
 
@@ -11,6 +12,13 @@ class Output:
         self.fileName = argd["outputFileName"]  # 文件名
         self.outputPath = f"{self.dir}/{self.fileName}.txt"  # 输出路径
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
+        self._writer = None  # 安全文件写入器
+
+    def _get_writer(self, mode: str = "w") -> SafeFileWriter:
+        """获取安全文件写入器"""
+        if not self._writer:
+            self._writer = SafeFileWriter(self.outputPath, mode, encoding="utf-8")
+        return self._writer
 
     def print(self, res):  # 输出图片信息
         if not res["code"] == 100 and self.ignoreBlank:
@@ -29,4 +37,10 @@ class Output:
             Platform.startfile(self.outputPath)
 
     def onEnd(self):  # 结束输出。
-        pass
+        if self._writer:
+            self._writer.close()
+            self._writer = None
+
+    def __del__(self):
+        """析构函数"""
+        self.onEnd()
