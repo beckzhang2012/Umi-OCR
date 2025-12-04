@@ -46,6 +46,12 @@ Item {
                 + " `Aztec, Codabar, Code128, Code39, Code93, DataBar, DataBarExpanded, DataMatrix, EAN13, EAN8, ITF, LinearCodes, MatrixCodes, MaxiCode, MicroQRCode, PDF417, QRCode, UPCA, UPCE`",
         },
         {
+            key: "DirectoryMonitor",
+            needController: true,
+            title: qsTr("目录监控"),
+            intro: qsTr("# 目录监控\n\n自动监控指定目录，新图片出现时自动分配到OCR任务。")
+        },
+        {
             key: "GlobalConfigsPage",
             title: qsTr("全局设置"),
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")

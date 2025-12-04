@@ -140,6 +140,11 @@ def main(app_path, engineAddImportPath=""):
 
     from .utils import pre_configs
     from .server.cmd_client import initCmd
+    from .scheduler.scheduler import Scheduler
+    from .directory_monitor.directory_monitor import DirectoryMonitorInstance
+    
+    Scheduler.start()
+    DirectoryMonitorInstance.start()
 
     # 安装某些软件时可能在系统中写入 QMLSCENE_DEVICE 环境变量，影响本软件的渲染方式，因此屏蔽该环境变量
     if "QMLSCENE_DEVICE" in os.environ:
