@@ -76,6 +76,7 @@ class ScreenshotOCR(Page):
             "onGet": self._onGet,
             "onEnd": self._onEnd,
             "argd": configDict,
+            "isScreenshot": True,  # 标记为截图OCR任务
         }
         msnID = MissionOCR.addMissionList(msnInfo, msnList)
         if msnID.startswith("[Error]"):  # 添加任务失败

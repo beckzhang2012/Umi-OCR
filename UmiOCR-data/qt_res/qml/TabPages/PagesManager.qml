@@ -55,6 +55,12 @@ Item {
             title: qsTr("关于"),
             intro: qsTr("# 关于")
         },
+        {
+            key: "PostProcessingRules",
+            needController: true,
+            title: qsTr("后处理规则"),
+            intro: qsTr("# 后处理规则\n\n自定义OCR识别结果的后处理规则，支持正则替换、大小写转换、全角半角转换等多种操作。")
+        },
     ]
 
     /* 存放当前已打开的页面
