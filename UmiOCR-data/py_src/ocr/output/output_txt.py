@@ -2,6 +2,7 @@
 
 from .output import Output
 from .tools import getDataText
+from ...utils.safe_file_ops import safe_write, ensure_directory_exists
 
 
 class OutputTxt(Output):
@@ -10,10 +11,11 @@ class OutputTxt(Output):
         self.fileName = argd["outputFileName"]  # 文件名
         self.outputPath = f"{self.dir}/{self.fileName}.txt"  # 输出路径
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
+        # 确保目录存在
+        ensure_directory_exists(self.outputPath)
         # 创建输出文件
         try:
-            with open(self.outputPath, "w", encoding="utf-8") as f:  # 覆盖创建文件
-                f.write(f'{argd["startDatetime"]}\n\n')  # 写入开始时间日期
+            safe_write(self.outputPath, f'{argd["startDatetime"]}\n\n', mode="w", encoding="utf-8", description="txt_output_init")
         except Exception as e:
             raise Exception(f"Failed to create txt file. {e}\n创建txt文件失败。")
 
@@ -29,5 +31,5 @@ class OutputTxt(Output):
         else:
             textOut += f'[Error] OCR failed. Code: {res["code"]}, Msg: {res["data"]}\n【异常】OCR识别失败。\n'
         textOut += "\n"  # 多空一行
-        with open(self.outputPath, "a", encoding="utf-8") as f:  # 追加写入本地文件
-            f.write(textOut)
+        # 追加写入文件
+        safe_write(self.outputPath, textOut, mode="a", encoding="utf-8", description="txt_output_print")

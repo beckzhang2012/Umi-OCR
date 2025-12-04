@@ -3,6 +3,7 @@
 import os
 from .output import Output
 from .tools import getDataText
+from ...utils.safe_file_ops import safe_write, ensure_directory_exists
 
 
 class OutputTxtIndividual(Output):
@@ -31,5 +32,9 @@ class OutputTxtIndividual(Output):
         else:  # 输出到指定路径
             f, _ = os.path.splitext(res["fileName"])  # 原文件名去除扩展名
             path = f"{self.dir}/{f}.txt"
-        with open(path, "w", encoding="utf-8") as f:  # 追加写入同名本地文件
-            f.write(textOut)
+        
+        # 确保目录存在
+        ensure_directory_exists(path)
+        
+        # 写入文件
+        safe_write(path, textOut, mode="w", encoding="utf-8", description="txt_individual_output")
