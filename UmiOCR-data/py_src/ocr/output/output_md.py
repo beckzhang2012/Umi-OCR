@@ -2,6 +2,7 @@
 
 from .output import Output
 from .tools import getDataText
+from ...utils.file_writer import file_writer
 
 import os
 
@@ -13,11 +14,9 @@ class OutputMD(Output):
         self.outputPath = f"{self.dir}/{self.fileName}.md"  # 输出路径
         self.ignoreBlank = argd["ignoreBlank"]  # 忽略空白文件
         # 创建输出文件
-        try:
-            with open(self.outputPath, "w", encoding="utf-8") as f:  # 覆盖创建文件
-                f.write(f'> {argd["startDatetime"]}\n\n')
-        except Exception as e:
-            raise Exception(f"Failed to create jsonl file. {e}\n创建jsonl文件失败。")
+        content = f'> {argd["startDatetime"]}\n\n'
+        if not file_writer.write_file(self.outputPath, content, mode='w', encoding='utf-8'):
+            raise Exception(f"Failed to create md file.\n创建md文件失败。")
 
     def print(self, res):  # 输出图片结果
         if not res["code"] == 100 and self.ignoreBlank:
@@ -42,5 +41,9 @@ class OutputMD(Output):
             pass
         else:
             textOut += f'> [Error] OCR failed. Code: {res["code"]}, Msg: {res["data"]}  \n> 【异常】OCR识别失败。  \n'
-        with open(self.outputPath, "a", encoding="utf-8") as f:  # 追加写入本地文件
-            f.write(textOut)
+        # 使用增强型文件写入工具追加写入
+        file_writer.write_file(self.outputPath, textOut, mode='a', encoding='utf-8')
+        
+        # 尝试处理缓存队列
+        if file_writer.get_queue_size() > 0:
+            file_writer.process_queue()
