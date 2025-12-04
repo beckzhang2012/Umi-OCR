@@ -6,12 +6,12 @@ import shutil
 import zipfile
 from urllib.parse import urlparse
 from uuid import uuid4
-from PySide2.QtCore import QMutex
+from PySide6.QtCore import QMutex
 from typing import Dict
 
 from umi_log import logger
 from call_func import CallFunc
-from .bottle import request, static_file, HTTPError
+from bottle import request, static_file, HTTPError
 from .ocr_server import get_ocr_options
 from ..ocr.output import Output
 from ..mission.mission_doc import MissionDOC, DocSuf

@@ -2,7 +2,7 @@
 # =============== 页面控制器基类 ===============
 # =============================================
 
-from PySide2.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from umi_log import logger
 

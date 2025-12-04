@@ -47,9 +47,9 @@ import site
 # 启动主qml。工作路径必须为 UmiOCR-data
 def runQml(engineAddImportPath):
     # ==================== 0. 导入包 ====================
-    from PySide2.QtCore import Qt, qInstallMessageHandler
-    from PySide2.QtGui import QGuiApplication
-    from PySide2.QtQml import QQmlApplicationEngine, qmlRegisterType
+    from PySide6.QtCore import Qt, qInstallMessageHandler
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterType
 
     from umi_about import UmiAbout  # 项目信息
     from umi_log import get_qt_message_handler, logger  # 日志

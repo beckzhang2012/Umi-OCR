@@ -51,6 +51,12 @@ Item {
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")
         },
         {
+            key: "PostProcessRules",
+            needController: true,
+            title: qsTr("后处理规则"),
+            intro: qsTr("# 后处理规则\n\n创建和管理OCR结果的后处理规则，将OCR结果进行清理和优化。")
+        },
+        {
             key: "About",
             title: qsTr("关于"),
             intro: qsTr("# 关于")

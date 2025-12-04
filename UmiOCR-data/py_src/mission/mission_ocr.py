@@ -15,6 +15,7 @@ from .mission import Mission
 from ..ocr.tbpu import getParser, IgnoreArea
 from ..ocr.api import getApiOcr, getLocalOptions
 from ..utils.utils import argdIntConvert
+from ..tag_pages.PostProcessRules import PostProcessRules
 
 # 合法文件后缀
 ImageSuf = [
@@ -111,6 +112,13 @@ class __MissionOcrClass(Mission):
                         res["code"] = 101
                         res["data"] = ""
                         break
+            # 将OCR结果转换为纯文本字符串
+            ocr_text = "".join([r["text"] for r in res["data"]])
+            # 应用后处理规则（暂时默认使用screenshot_ocr类型的规则）
+            post_process_rules = PostProcessRules("PostProcessRules", None)
+            processed_text = post_process_rules.apply_rules("screenshot_ocr", ocr_text)
+            # 将处理后的文本更新回结果字典
+            res["processed_text"] = processed_text
         return res
 
     # ========================= 【qml接口】 =========================

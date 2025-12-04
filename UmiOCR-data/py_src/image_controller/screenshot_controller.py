@@ -6,7 +6,7 @@ from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..utils.file_finder import findFiles
 
 import time
-from PySide2.QtGui import QGuiApplication, QClipboard, QImage, QPixmap  # 截图 剪贴板
+from PySide6.QtGui import QGuiApplication, QClipboard, QImage, QPixmap  # 截图 剪贴板
 
 Clipboard = QClipboard()  # 剪贴板
 

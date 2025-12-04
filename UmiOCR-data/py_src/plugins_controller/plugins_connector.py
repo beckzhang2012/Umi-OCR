@@ -2,7 +2,7 @@
 # =============== 插件管理连接器 ===============
 # =============================================
 
-from PySide2.QtCore import QObject, Slot, Signal
+from PySide6.QtCore import QObject, Slot, Signal
 
 from .plugins_controller import PluginsController
 
