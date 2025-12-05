@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-12-05 09:33:35",
+  "image_count": 500,
+  "max_concurrent": 6,
+  "single_thread": {
+    "test_type": "single_thread",
+    "image_count": 500,
+    "total_time": 152.52027893066406,
+    "avg_processing_time": 152.5205729007721,
+    "max_processing_time": 152.5205729007721,
+    "min_processing_time": 152.5205729007721
+  },
+  "multi_thread": {
+    "test_type": "multi_thread",
+    "image_count": 500,
+    "max_concurrent": 6,
+    "total_time": 26.970699548721313,
+    "summary": {
+      "avg_processing_time": 26.971097946166992,
+      "max_processing_time": 26.971097946166992,
+      "min_processing_time": 26.971097946166992
+    }
+  },
+  "speedup": 5.655036075543509
+}
