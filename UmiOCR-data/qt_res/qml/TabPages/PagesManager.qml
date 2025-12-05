@@ -55,6 +55,12 @@ Item {
             title: qsTr("关于"),
             intro: qsTr("# 关于")
         },
+        {
+            key: "PerformanceMonitor",
+            needController: true,
+            title: qsTr("性能监控"),
+            intro: qsTr("# 性能监控\n\n实时监控OCR运行状态，包括CPU/GPU使用率、内存占用、任务吞吐等指标，并支持告警和数据导出。")
+        },
     ]
 
     /* 存放当前已打开的页面
