@@ -15,6 +15,7 @@ from .mission import Mission
 from ..ocr.tbpu import getParser, IgnoreArea
 from ..ocr.api import getApiOcr, getLocalOptions
 from ..utils.utils import argdIntConvert
+from ..optimization import get_hardware_scheduler
 
 # 合法文件后缀
 ImageSuf = [
@@ -35,6 +36,11 @@ class __MissionOcrClass(Mission):
         super().__init__()
         self._apiKey = ""  # 当前api类型
         self._api = None  # 当前引擎api对象
+        self._hardware_scheduler = get_hardware_scheduler()
+        self._last_backend = None
+        
+        # 连接硬件调度器信号
+        self._hardware_scheduler.backend_changed.connect(self._on_backend_changed)
 
     # ========================= 【重载】 =========================
 
@@ -68,16 +74,29 @@ class __MissionOcrClass(Mission):
         # 检查API对象
         if not self._api:
             return "[Error] MissionOCR: API object is None."
-        # 检查参数更新
+        
+        # 获取硬件调度器优化后的参数
         startInfo = self._dictShortKey(msnInfo["argd"])
+        optimized_info = self._hardware_scheduler.get_optimized_params(startInfo)
+        
         # 恢复int类型
-        argdIntConvert(startInfo)
-        msg = self._api.start(startInfo)
+        argdIntConvert(optimized_info)
+        
+        # 检查后端是否变化
+        current_backend = self._hardware_scheduler.get_current_backend()
+        if current_backend != self._last_backend:
+            logger.info(f"OCR后端已切换: {self._last_backend} -> {current_backend}")
+            self._last_backend = current_backend
+            
+            # 添加后端信息到参数
+            optimized_info["backend"] = current_backend
+            
+        msg = self._api.start(optimized_info)
         if msg.startswith("[Error]"):
             logger.error(f"OCR引擎启动失败： {msg}")
             return msg  # 更新失败，结束该队列
         else:
-            return ""  # 更新成功 TODO: continue
+            return ""  # 更新成功
 
     def msnTask(self, msnInfo, msn):  # 执行msn
         if "path" in msn:
@@ -160,6 +179,34 @@ class __MissionOcrClass(Mission):
             return getLocalOptions(self._apiKey)
         else:
             return {}
+            
+    def _on_backend_changed(self, new_backend: str, old_backend: str, reason: str):
+        """后端变化处理"""
+        logger.info(f"OCR后端切换通知: {old_backend} -> {new_backend}, 原因: {reason}")
+        
+        # 可以在这里添加额外的处理逻辑，比如重新初始化API
+        if self._api:
+            # 重新启动API以应用新的后端配置
+            current_info = self._api.get_current_info() if hasattr(self._api, 'get_current_info') else {}
+            optimized_info = self._hardware_scheduler.get_optimized_params(current_info)
+            optimized_info["backend"] = new_backend
+            
+            try:
+                msg = self._api.start(optimized_info)
+                if msg.startswith("[Error]"):
+                    logger.error(f"后端切换后API重启失败: {msg}")
+                else:
+                    logger.info(f"后端切换后API重启成功")
+            except Exception as e:
+                logger.error(f"后端切换后API重启异常: {e}")
+                
+    def getHardwareStatus(self):
+        """获取硬件状态信息"""
+        return self._hardware_scheduler.get_hardware_info()
+        
+    def setBackend(self, backend: str):
+        """设置后端类型"""
+        self._hardware_scheduler.set_backend(backend)
 
 
 # 全局 OCR任务管理器
