@@ -9,12 +9,17 @@
 """
 
 import os
+import time
 
 from umi_log import logger
 from .mission import Mission
 from ..ocr.tbpu import getParser, IgnoreArea
 from ..ocr.api import getApiOcr, getLocalOptions
+from ..ocr.api.hardware_manager import HardwareManagerGlobal, BackendType
 from ..utils.utils import argdIntConvert
+from ..scheduler.optimized_scheduler import OptimizedTaskSchedulerGlobal
+from ..scheduler.cpu_optimized_scheduler import CPUOptimizedSchedulerGlobal
+from ..monitor.throughput_monitor import ThroughputMonitorGlobal
 
 # 合法文件后缀
 ImageSuf = [
@@ -35,6 +40,18 @@ class __MissionOcrClass(Mission):
         super().__init__()
         self._apiKey = ""  # 当前api类型
         self._api = None  # 当前引擎api对象
+        
+        # 优化组件初始化
+        self.optimized_scheduler = OptimizedTaskSchedulerGlobal
+        self.cpu_optimized_scheduler = CPUOptimizedSchedulerGlobal
+        self.throughput_monitor = ThroughputMonitorGlobal
+        self.hardware_manager = HardwareManagerGlobal
+        
+        # 启动GPU监控
+        self.hardware_manager.start_gpu_monitoring()
+        
+        # 启动CPU优化调度器
+        self.cpu_optimized_scheduler.start()
 
     # ========================= 【重载】 =========================
 
@@ -80,18 +97,44 @@ class __MissionOcrClass(Mission):
             return ""  # 更新成功 TODO: continue
 
     def msnTask(self, msnInfo, msn):  # 执行msn
+        # 获取当前后端
+        current_backend = self.hardware_manager.get_current_backend()
+        
         if "path" in msn:
-            res = self._api.runPath(msn["path"])
-            res["path"] = msn["path"]  # 结果字典中补充参数
+            data = msn["path"]
+            run_func = self._api.runPath
         elif "bytes" in msn:
-            res = self._api.runBytes(msn["bytes"])
+            data = msn["bytes"]
+            run_func = self._api.runBytes
         elif "base64" in msn:
-            res = self._api.runBase64(msn["base64"])
+            data = msn["base64"]
+            run_func = self._api.runBase64
         else:
             res = {
                 "code": 901,
                 "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
             }
+            return res
+        
+        # 记录线程等待时间（开始）
+        thread_start_time = time.time()
+        
+        # 根据当前后端选择不同的调度器
+        if current_backend == BackendType.GPU:
+            # GPU模式：使用优化调度器
+            res = self.optimized_scheduler.submit_task(run_func, data)
+        else:
+            # CPU模式：使用CPU优化调度器
+            res = self.cpu_optimized_scheduler.submit_task(run_func, data)
+        
+        # 记录线程等待时间（结束）
+        thread_wait_time = time.time() - thread_start_time
+        self.throughput_monitor.record_thread_wait_time(thread_wait_time)
+        
+        # 补充路径参数
+        if "path" in msn:
+            res["path"] = msn["path"]
+        
         # 任务成功时的后处理
         if res["code"] == 100:
             # 计算平均置信度
@@ -102,6 +145,7 @@ class __MissionOcrClass(Mission):
             if num > 0:
                 score /= num
             res["score"] = score
+            
             # 执行 tbpu
             if msnInfo["tbpu"]:
                 for tbpu in msnInfo["tbpu"]:
@@ -111,6 +155,21 @@ class __MissionOcrClass(Mission):
                         res["code"] = 101
                         res["data"] = ""
                         break
+            
+            # 添加硬件和优化信息到结果
+            switch_reason = self.hardware_manager.get_switch_reason()
+            
+            res["hardware_info"] = {
+                "current_backend": current_backend.value,
+                "switch_reason": switch_reason.value if switch_reason else None,
+                "expected_recovery_time": self.hardware_manager.get_expected_recovery_time(),
+            }
+            
+            res["optimization_info"] = {
+                "used_slices": 0,  # 暂时未实现切片功能
+                "max_memory": 0,  # 暂时未实现内存监控
+            }
+        
         return res
 
     # ========================= 【qml接口】 =========================
