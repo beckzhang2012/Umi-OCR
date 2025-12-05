@@ -9,12 +9,17 @@
 """
 
 import os
+import time
 
 from umi_log import logger
 from .mission import Mission
 from ..ocr.tbpu import getParser, IgnoreArea
 from ..ocr.api import getApiOcr, getLocalOptions
+from ..ocr.api.slice_orchestrator import SliceOrchestratorGlobal
 from ..utils.utils import argdIntConvert
+from ..utils.memory_pool import MemoryPoolGlobal
+from ..scheduler.optimized_scheduler import OptimizedTaskSchedulerGlobal
+from ..monitor.throughput_monitor import ThroughputMonitorGlobal
 
 # 合法文件后缀
 ImageSuf = [
@@ -35,6 +40,12 @@ class __MissionOcrClass(Mission):
         super().__init__()
         self._apiKey = ""  # 当前api类型
         self._api = None  # 当前引擎api对象
+        
+        # 优化模块
+        self._slice_orchestrator = SliceOrchestratorGlobal
+        self._memory_pool = MemoryPoolGlobal
+        self._optimized_scheduler = OptimizedTaskSchedulerGlobal
+        self._throughput_monitor = ThroughputMonitorGlobal
 
     # ========================= 【重载】 =========================
 
@@ -80,38 +91,157 @@ class __MissionOcrClass(Mission):
             return ""  # 更新成功 TODO: continue
 
     def msnTask(self, msnInfo, msn):  # 执行msn
-        if "path" in msn:
-            res = self._api.runPath(msn["path"])
-            res["path"] = msn["path"]  # 结果字典中补充参数
-        elif "bytes" in msn:
-            res = self._api.runBytes(msn["bytes"])
-        elif "base64" in msn:
-            res = self._api.runBase64(msn["base64"])
-        else:
+        # 开始任务监测
+        task_id = f"{msnInfo['msnID']}_{int(time.time())}"
+        self._throughput_monitor.start_task_monitoring(task_id)
+        
+        try:
+            # 加载图像
+            if "path" in msn:
+                image_path = msn["path"]
+                slices = self._slice_orchestrator.slice_image(image_path=image_path)
+            elif "bytes" in msn:
+                image_bytes = msn["bytes"]
+                slices = self._slice_orchestrator.slice_image(image_bytes=image_bytes)
+            elif "base64" in msn:
+                image_base64 = msn["base64"]
+                slices = self._slice_orchestrator.slice_image(image_base64=image_base64)
+            else:
+                res = {
+                    "code": 901,
+                    "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+                }
+                return res
+            
+            # 计算图像大小
+            if slices:
+                first_slice = slices[0]['image_np']
+                image_size = first_slice.shape[0] * first_slice.shape[1] * len(slices)
+            else:
+                image_size = 0
+            
+            # 处理所有切片
+            slice_results = []
+            
+            def _slice_task(slice_data):
+                """切片处理任务"""
+                try:
+                    # 从内存池获取buffer
+                    slice_np = slice_data['image_np']
+                    buffer = self._memory_pool.get_cpu_buffer(slice_np.shape)
+                    
+                    # 复制图像数据到buffer
+                    buffer[:] = slice_np[:]
+                    
+                    # 执行OCR
+                    res = self._api.runBytes(buffer.tobytes())
+                    
+                    # 释放buffer回内存池
+                    self._memory_pool.release_cpu_buffer(buffer)
+                    
+                    # 添加切片信息到结果
+                    res['offset'] = slice_data['offset']
+                    res['slice_index'] = slice_data.get('slice_index', 0)
+                    
+                    return res
+                    
+                except Exception as e:
+                    logger.error(f"切片处理失败: {e}")
+                    return {
+                        "code": 902,
+                        "data": f"[Error] Slice processing failed: {e}",
+                    }
+            
+            # 使用优化的任务调度器处理切片
+            from concurrent.futures import Future
+            import psutil
+            
+            futures: List[Future] = []
+            max_memory = 0
+            
+            for i, slice_data in enumerate(slices):
+                slice_data['slice_index'] = i
+                
+                # 记录线程等待时间
+                wait_start_time = time.time()
+                
+                # 添加任务到调度器
+                future = Future()
+                futures.append(future)
+                
+                def _task_callback(result, future=future):
+                    nonlocal max_memory
+                    # 记录内存使用峰值
+                    current_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+                    if current_memory > max_memory:
+                        max_memory = current_memory
+                    future.set_result(result)
+                
+                self._optimized_scheduler.add_task(
+                    _slice_task,
+                    args=[slice_data],
+                    callback=_task_callback,
+                    image_size=image_size
+                )
+                
+                # 记录线程等待时间
+                wait_time = time.time() - wait_start_time
+                self._throughput_monitor.record_thread_wait_time(wait_time)
+            
+            # 等待所有切片处理完成
+            for future in futures:
+                slice_res = future.result()
+                slice_results.append(slice_res)
+            
+            # 合并切片结果
+            if slices:
+                first_slice = slices[0]['image_np']
+                image_shape = (first_slice.shape[0] * len(slices), first_slice.shape[1])
+            else:
+                image_shape = (0, 0)
+            
+            merged_data = self._slice_orchestrator.merge_results(slice_results, image_shape)
+            
+            # 生成最终结果
             res = {
-                "code": 901,
-                "data": f"[Error] Unknown task type.\n【异常】未知的任务类型。\n{str(msn)[:100]}",
+                "code": 100,
+                "data": merged_data,
             }
-        # 任务成功时的后处理
-        if res["code"] == 100:
-            # 计算平均置信度
-            score, num = 0, 0
-            for r in res["data"]:
-                score += r["score"]
-                num += 1
-            if num > 0:
-                score /= num
-            res["score"] = score
-            # 执行 tbpu
-            if msnInfo["tbpu"]:
-                for tbpu in msnInfo["tbpu"]:
-                    res["data"] = tbpu.run(res["data"])
-                    # 如果忽略区域等处理将所有文本删除，则结束tbpu
-                    if not res["data"]:
-                        res["code"] = 101
-                        res["data"] = ""
-                        break
-        return res
+            
+            # 任务成功时的后处理
+            if res["code"] == 100:
+                # 计算平均置信度
+                score, num = 0, 0
+                for r in res["data"]:
+                    score += r["score"]
+                    num += 1
+                if num > 0:
+                    score /= num
+                res["score"] = score
+                
+                # 执行 tbpu
+                if msnInfo["tbpu"]:
+                    for tbpu in msnInfo["tbpu"]:
+                        res["data"] = tbpu.run(res["data"])
+                        # 如果忽略区域等处理将所有文本删除，则结束tbpu
+                        if not res["data"]:
+                            res["code"] = 101
+                            res["data"] = ""
+                            break
+            
+            # 补充路径信息和内存峰值
+            if "path" in msn:
+                res["path"] = msn["path"]
+            res["max_memory"] = max_memory  # MB
+            
+            # 记录内存峰值到吞吐量监测器
+            ThroughputMonitorGlobal.update_peak_resources(memory_peak=max_memory / 1024)  # 转换为GB
+            
+            return res
+            
+        finally:
+            # 停止任务监测
+            self._throughput_monitor.stop_task_monitoring()
 
     # ========================= 【qml接口】 =========================
 
