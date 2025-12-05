@@ -7,9 +7,12 @@ from PySide2.QtCore import QMutex, QRunnable
 from threading import Condition
 from uuid import uuid4  # 唯一ID
 import time
+import threading
+from typing import Dict, List
 
 from umi_log import logger
 from ..utils.thread_pool import threadRun  # 异步执行函数
+from ..optimization.ocr_optimization import get_task_scheduler, get_throughput_monitor
 
 
 class Mission:
@@ -23,7 +26,17 @@ class Mission:
         # 任务队列调度方式
         # 1111 : 轮询调度，轮流取每个队列的第1个任务
         # 1234 : 顺序调度，将首个队列所有任务处理完，再进入下一个队列
-        self._schedulingMode = "1111"
+        # optimized : 优化调度，根据图片大小动态分配
+        self._schedulingMode = "optimized"
+        
+        # 优化组件
+        self._task_scheduler = get_task_scheduler()
+        self._throughput_monitor = get_throughput_monitor()
+        self._optimized_mode = True  # 是否启用优化模式
+        self._max_concurrent_tasks = 6  # 最大并发任务数
+        self._active_tasks = 0  # 当前活跃任务数
+        self._active_tasks_mutex = threading.Lock()
+        self._task_condition = Condition(self._active_tasks_mutex)
 
     # ========================= 【调用接口】 =========================
 
@@ -188,6 +201,109 @@ class Mission:
     # ========================= 【子线程 方法】 =========================
 
     def _taskRun(self):  # 异步执行任务字典的流程
+        if self._optimized_mode and self._schedulingMode == "optimized":
+            self._optimized_task_run()
+        else:
+            self._legacy_task_run()
+        
+        # 完成
+        self._taskFinish()
+    
+    def _optimized_task_run(self):
+        """优化的任务执行流程"""
+        # 首先将所有任务加载到调度器
+        self._load_tasks_to_scheduler()
+        
+        # 启动工作线程池
+        worker_threads = []
+        for _ in range(self._max_concurrent_tasks):
+            thread = threading.Thread(target=self._optimized_worker)
+            worker_threads.append(thread)
+            thread.start()
+        
+        # 等待所有工作线程完成
+        for thread in worker_threads:
+            thread.join()
+    
+    def _optimized_worker(self):
+        """优化的工作线程"""
+        while True:
+            # 获取任务
+            task = self._task_scheduler.get_task(prefer_small=True)
+            if not task:
+                break
+            
+            dictKey = task["dictKey"]
+            msnInfo = task["msnInfo"]
+            msn = task["msn"]
+            
+            # 检查任务是否要求停止
+            if msnInfo["state"] == "stop":
+                continue
+            
+            # 执行任务
+            try:
+                msnInfo["onReady"](msnInfo, msn)
+                t1 = time.time()
+                res = self.msnTask(msnInfo, msn)
+                t2 = time.time()
+                
+                if isinstance(res, dict):  # 补充耗时和时间戳
+                    res["time"] = t2 - t1
+                    res["timestamp"] = t2
+                
+                # 回调结果
+                msnInfo["onGet"](msnInfo, msn, res)
+                
+            except Exception as e:
+                logger.error(f"优化任务执行失败: {msn.get('path', 'unknown')}, error: {e}")
+                res = {
+                    "code": 903,
+                    "data": f"[Error] Optimized task execution failed.\n【异常】优化任务执行失败。\n{str(e)}",
+                    "time": 0,
+                    "timestamp": time.time()
+                }
+                msnInfo["onGet"](msnInfo, msn, res)
+    
+    def _load_tasks_to_scheduler(self):
+        """将任务加载到优化调度器"""
+        self._msnMutex.lock()
+        try:
+            for dictKey, msnInfo in self._msnInfoDict.items():
+                if msnInfo["state"] == "stop":
+                    continue
+                
+                # 执行前处理
+                preFlag = self.msnPreTask(msnInfo)
+                if preFlag.startswith("[Error]"):
+                    msnInfo["onEnd"](msnInfo, preFlag)
+                    self._msnDictDel(dictKey)
+                    continue
+                
+                # 标记为运行中
+                if msnInfo["state"] == "waiting":
+                    msnInfo["state"] = "running"
+                    msnInfo["onStart"](msnInfo)
+                
+                # 将任务添加到调度器
+                msnList = self._msnListDict[dictKey]
+                for msn in msnList:
+                    self._task_scheduler.add_task({
+                        "dictKey": dictKey,
+                        "msnInfo": msnInfo,
+                        "msn": msn,
+                        "path": msn.get("path"),
+                        "width": msn.get("width"),
+                        "height": msn.get("height")
+                    })
+                
+                # 清空原始任务列表
+                msnList.clear()
+                
+        finally:
+            self._msnMutex.unlock()
+    
+    def _legacy_task_run(self):  # 异步执行任务字典的流程（旧版本）
         dictIndex = 0  # 当前取任务字典中的第几个任务队列
         # 循环，直到任务队列的列表为空
         while True:
@@ -265,9 +381,6 @@ class Mission:
                 self._msnMutex.unlock()  # 锁3 解锁
                 dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
 
-        # 完成
-        self._taskFinish()
-
     def _msnDictDel(self, dictKey):  # 停止一组任务队列
         # 正常 删除任务队列项
         if dictKey in self._msnInfoDict:
@@ -300,3 +413,60 @@ class Mission:
 
     def getStatus(self):  # 返回当前状态
         return "Mission 基类 返回空状态"
+    
+    # ========================= 【优化配置接口】 =========================
+    
+    def setSchedulingMode(self, mode: str) -> bool:
+        """设置任务调度模式
+        
+        Args:
+            mode: 调度模式 ("1111", "1234", "optimized")
+            
+        Returns:
+            是否设置成功
+        """
+        if mode in ["1111", "1234", "optimized"]:
+            self._schedulingMode = mode
+            logger.info(f"任务调度模式已设置为: {mode}")
+            return True
+        return False
+    
+    def getSchedulingMode(self) -> str:
+        """获取当前任务调度模式"""
+        return self._schedulingMode
+    
+    def setOptimizedMode(self, enabled: bool) -> None:
+        """设置是否启用优化模式"""
+        self._optimized_mode = enabled
+        logger.info(f"优化模式已{'启用' if enabled else '禁用'}")
+    
+    def getOptimizedMode(self) -> bool:
+        """获取是否启用优化模式"""
+        return self._optimized_mode
+    
+    def setMaxConcurrentTasks(self, max_tasks: int) -> bool:
+        """设置最大并发任务数
+        
+        Args:
+            max_tasks: 最大并发任务数 (1-16)
+            
+        Returns:
+            是否设置成功
+        """
+        if 1 <= max_tasks <= 16:
+            self._max_concurrent_tasks = max_tasks
+            logger.info(f"最大并发任务数已设置为: {max_tasks}")
+            return True
+        return False
+    
+    def getMaxConcurrentTasks(self) -> int:
+        """获取最大并发任务数"""
+        return self._max_concurrent_tasks
+    
+    def getPerformanceMetrics(self) -> Dict:
+        """获取性能指标"""
+        return self._throughput_monitor.get_metrics()
+    
+    def resetPerformanceMetrics(self) -> None:
+        """重置性能指标"""
+        self._throughput_monitor.reset()
