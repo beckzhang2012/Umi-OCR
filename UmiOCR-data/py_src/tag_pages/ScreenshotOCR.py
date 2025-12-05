@@ -2,10 +2,12 @@
 # =============== 截图OCR页 ===============
 # ========================================
 
+import time
 from PySide2.QtGui import QClipboard  # 截图 剪贴板
 
 from umi_log import logger
 from .page import Page  # 页基类
+from .ReviewBoard import ReviewBoard  # 审阅看板控制器
 from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
@@ -106,6 +108,22 @@ class ScreenshotOCR(Page):
         imgPath = msn.get("path", "")
         self.recentResult.append(res)  # 记录结果
         self.callQmlInMain("onOcrGet", res, imgID, imgPath)  # 在主线程中调用qml
+        
+        # 将OCR结果添加到审阅看板
+        if res["code"] == 100:  # 识别成功
+            # 提取识别文本
+            text_content = "\n".join([r["text"] for r in res["data"]])
+            
+            # 构造审阅项数据
+            review_item = {
+                "source_path": imgPath,
+                "text_content": text_content,
+                "confidence": res["score"],
+                "timestamp": msnInfo.get("startTimestamp", time.time())
+            }
+            
+            # 添加到审阅看板
+            ReviewBoard.add_ocr_result(review_item)
 
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
         # msg: [Success] [Warning] [Error]
