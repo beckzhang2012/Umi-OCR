@@ -138,6 +138,9 @@ if __name__ == "__main__":
     try:
         # 获取 pystand.exe 记录的程序入口环境变量
         app_path = os.environ.get("PYSTAND", "")
+        # 如果PYSTAND环境变量不存在，使用main.py的路径作为app_path
+        if not app_path:
+            app_path = os.path.abspath(__file__)
         # 启动正式入口
         from py_src.run import main
 
