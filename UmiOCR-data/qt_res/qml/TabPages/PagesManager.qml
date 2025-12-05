@@ -51,6 +51,12 @@ Item {
             intro: qsTr("# 全局设置\n\n调节全局设置项，对所有页面生效。")
         },
         {
+            key: "PerformanceMonitor",
+            needController: true,
+            title: qsTr("性能监控"),
+            intro: qsTr("# 性能监控\n\n实时监控 OCR 运行状态，包括 CPU/GPU 占用、内存曲线、任务吞吐、失败率等指标。支持自定义阈值告警、历史数据查看与导出、一键复制诊断包等功能。")
+        },
+        {
             key: "About",
             title: qsTr("关于"),
             intro: qsTr("# 关于")

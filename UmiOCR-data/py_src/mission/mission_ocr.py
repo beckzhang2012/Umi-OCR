@@ -15,6 +15,7 @@ from .mission import Mission
 from ..ocr.tbpu import getParser, IgnoreArea
 from ..ocr.api import getApiOcr, getLocalOptions
 from ..utils.utils import argdIntConvert
+from ..monitor.performance_data_collector import PerformanceDataCollectorGlobal
 
 # 合法文件后缀
 ImageSuf = [
@@ -111,6 +112,13 @@ class __MissionOcrClass(Mission):
                         res["code"] = 101
                         res["data"] = ""
                         break
+
+        # 记录任务状态到性能数据收集器
+        if res["code"] == 100:
+            PerformanceDataCollectorGlobal.record_task_completion()
+        else:
+            PerformanceDataCollectorGlobal.record_task_failure()
+
         return res
 
     # ========================= 【qml接口】 =========================
