@@ -128,8 +128,8 @@ def runQml(engineAddImportPath):
 
 def main(app_path, engineAddImportPath=""):
     """
-    `app_path`: 程序入口文件 路径\n
-    `engineAddImportPath`: 可选，qml包路径\n
+    `app_path`: 程序入口文件 路径
+    `engineAddImportPath`: 可选，qml包路径
     """
     # 初始化运行信息
     site.addsitedir("./py_src/imports")  # 自定义库添加到搜索路径
@@ -140,6 +140,7 @@ def main(app_path, engineAddImportPath=""):
 
     from .utils import pre_configs
     from .server.cmd_client import initCmd
+    from .monitor.performance_data_collector import PerformanceDataCollectorGlobal
 
     # 安装某些软件时可能在系统中写入 QMLSCENE_DEVICE 环境变量，影响本软件的渲染方式，因此屏蔽该环境变量
     if "QMLSCENE_DEVICE" in os.environ:
@@ -148,5 +149,9 @@ def main(app_path, engineAddImportPath=""):
     pre_configs.readConfigs()  # 初始化预配置项
     if not initCmd():  # 初始化命令行，如果已有Umi-OCR在运行则结束运行
         sys.exit(0)
+
+    # 启动性能数据收集器
+    PerformanceDataCollectorGlobal.start()
+
     runQml(engineAddImportPath)  # 启动qml
     sys.exit(0)
