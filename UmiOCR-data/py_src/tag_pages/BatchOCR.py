@@ -7,6 +7,7 @@ import time
 
 from umi_log import logger
 from .page import Page  # 页基类
+from .ReviewBoard import ReviewBoard  # 审阅看板控制器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..utils.utils import allowedFileName
 from ..ocr.output import Output  # 输出器
@@ -150,6 +151,18 @@ class BatchOCR(Page):
         # 补充参数
         res["fileName"] = os.path.basename(msn["path"])
         res["dir"] = os.path.dirname(msn["path"])
+        
+        # 补充平均置信度
+        score = 0
+        num = 0
+        if res["code"] == 100:
+            for r in res["data"]:
+                score += r["score"]
+                num += 1
+            if num > 0:
+                score /= num
+        res["score"] = score
+        
         # 输出器输出
         for o in self.outputList:
             try:
@@ -158,6 +171,33 @@ class BatchOCR(Page):
                 logger.error(f"结果输出失败：{o}", exc_info=True, stack_info=True)
         # 通知qml更新UI
         self.callQmlInMain("onOcrGet", msn["path"], res)  # 在主线程中调用qml
+        
+        # 将OCR结果添加到审阅看板
+        if res["code"] == 100:  # 识别成功
+            # 提取识别文本
+            text_content = "\n".join([r["text"] for r in res["data"]])
+            
+            # 构造审阅项数据
+            review_item = {
+                "source_path": msn["path"],
+                "text_content": text_content,
+                "confidence": res["score"],
+                "timestamp": self.argd.get("startTimestamp", time.time())
+            }
+            
+            # 添加到审阅看板
+            try:
+                # 从父容器获取ReviewBoard实例
+                review_board = self.parentConnector.pages.get(f"ReviewBoard_1", {}).get("pyObj")
+                if review_board:
+                    review_board.add_ocr_result(review_item)
+                else:
+                    # 如果实例不存在，先创建一个临时实例
+                    logger.warning("ReviewBoard实例不存在，使用临时实例添加结果")
+                    temp_board = ReviewBoard("ReviewBoard_temp", self.parentConnector)
+                    temp_board.add_ocr_result(review_item)
+            except Exception as e:
+                logger.error(f"添加结果到审阅看板失败: {str(e)}")
 
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
         if msnInfo:

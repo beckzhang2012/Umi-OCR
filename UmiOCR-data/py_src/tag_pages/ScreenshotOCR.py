@@ -2,10 +2,12 @@
 # =============== 截图OCR页 ===============
 # ========================================
 
+import time
 from PySide2.QtGui import QClipboard  # 截图 剪贴板
 
 from umi_log import logger
 from .page import Page  # 页基类
+from .ReviewBoard import ReviewBoard  # 审阅看板控制器
 from ..image_controller.image_provider import PixmapProvider  # 图片提供器
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..event_bus.pubsub_service import PubSubService  # 发布/订阅管理器
@@ -106,6 +108,33 @@ class ScreenshotOCR(Page):
         imgPath = msn.get("path", "")
         self.recentResult.append(res)  # 记录结果
         self.callQmlInMain("onOcrGet", res, imgID, imgPath)  # 在主线程中调用qml
+        
+        # 将OCR结果添加到审阅看板
+        if res["code"] == 100:  # 识别成功
+            # 提取识别文本
+            text_content = "\n".join([r["text"] for r in res["data"]])
+            
+            # 构造审阅项数据
+            review_item = {
+                "source_path": imgPath,
+                "text_content": text_content,
+                "confidence": res["score"],
+                "timestamp": msnInfo.get("startTimestamp", time.time())
+            }
+            
+            # 添加到审阅看板
+            try:
+                # 从父容器获取ReviewBoard实例
+                review_board = self.parentConnector.pages.get(f"ReviewBoard_1", {}).get("pyObj")
+                if review_board:
+                    review_board.add_ocr_result(review_item)
+                else:
+                    # 如果实例不存在，先创建一个临时实例
+                    logger.warning("ReviewBoard实例不存在，使用临时实例添加结果")
+                    temp_board = ReviewBoard("ReviewBoard_temp", self.parentConnector)
+                    temp_board.add_ocr_result(review_item)
+            except Exception as e:
+                logger.error(f"添加结果到审阅看板失败: {str(e)}")
 
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
         # msg: [Success] [Warning] [Error]
