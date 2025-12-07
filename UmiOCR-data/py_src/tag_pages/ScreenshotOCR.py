@@ -123,7 +123,18 @@ class ScreenshotOCR(Page):
             }
             
             # 添加到审阅看板
-            ReviewBoard.add_ocr_result(review_item)
+            try:
+                # 从父容器获取ReviewBoard实例
+                review_board = self.parentConnector.pages.get(f"ReviewBoard_1", {}).get("pyObj")
+                if review_board:
+                    review_board.add_ocr_result(review_item)
+                else:
+                    # 如果实例不存在，先创建一个临时实例
+                    logger.warning("ReviewBoard实例不存在，使用临时实例添加结果")
+                    temp_board = ReviewBoard("ReviewBoard_temp", self.parentConnector)
+                    temp_board.add_ocr_result(review_item)
+            except Exception as e:
+                logger.error(f"添加结果到审阅看板失败: {str(e)}")
 
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
         # msg: [Success] [Warning] [Error]
