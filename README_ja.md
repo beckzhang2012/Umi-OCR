@@ -203,6 +203,7 @@ Umi-OCR v2 は、一連の柔軟で使いやすい**タブインターフェー�
 
 - [コマンドラインマニュアル](docs/README_CLI.md)
 - [HTTP API マニュアル](docs/http/README.md)
+- [Jupyter ノートブックの例](examples/jupyter/README.md)
 
 ## プロジェクト構造について
 

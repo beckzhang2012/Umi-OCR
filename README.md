@@ -88,6 +88,7 @@
 - [全局设置](#全局设置)
 - [命令行调用](docs/README_CLI.md)
 - [HTTP接口](docs/http/README.md)
+- [Jupyter示例](examples/jupyter/README.md)
 - [构建项目（Windows、Linux）](#构建项目)
 
 ## 使用源码
@@ -250,6 +251,7 @@ Umi-OCR v2 由一系列灵活好用的**标签页**组成。您可按照自己�
 
 - [命令行手册](docs/README_CLI.md)
 - [HTTP接口手册](docs/http/README.md)
+- [Jupyter笔记本示例](examples/jupyter/README.md)
 
 ---
 
