@@ -224,6 +224,7 @@ About **OCR Text Post-Processing - Ignore Regions**: This is a special function 
 
 - [Command-line manual](docs/README_CLI.md)
 - [HTTP API manual](docs/http/README.md)
+- [Jupyter Notebook Examples](examples/jupyter/README.md)
 
 ## About Project Structure
 
