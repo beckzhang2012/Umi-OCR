@@ -22,10 +22,10 @@ Install the required Python packages:
 pip install requests pillow pandas tqdm jupyter
 ```
 
-Or install all dependencies at once:
+For optional visualization features:
 
 ```bash
-pip install -r requirements.txt
+pip install ipywidgets matplotlib
 ```
 
 ## Notebooks
