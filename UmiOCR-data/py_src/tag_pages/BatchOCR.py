@@ -22,28 +22,79 @@ class BatchOCR(Page):
     # ========================= 【qml调用python】 =========================
 
     def msnPaths(self, paths, argd):  # 接收路径列表和配置参数字典，开始OCR任务
-        # 任务信息
-        msnInfo = {
-            "onStart": self._onStart,
-            "onReady": self._onReady,
-            "onGet": self._onGet,
-            "onEnd": self._onEnd,
-            "argd": argd,
-        }
         # 预处理参数字典
         if not self._preprocessArgd(argd, paths[0]):
             return ""
         # 构造输出器
         if not self._initOutputList(argd):
             return ""
-        # 路径转为任务列表格式，加载进任务管理器
-        msnList = [{"path": x} for x in paths]
-        self.msnID = MissionOCR.addMissionList(msnInfo, msnList)
-        if self.msnID.startswith("[Error]"):  # 添加任务失败
-            self._onEnd(None, f"{self.msnID}\n添加任务失败。")
-        else:  # 添加成功，通知前端刷新UI
-            logger.debug(f"添加任务成功 {self.msnID}")
-        return self.msnID
+        
+        # 批处理大小
+        batch_size = 50
+        total_paths = len(paths)
+        
+        # 如果路径数量小于等于批处理大小，直接处理
+        if total_paths <= batch_size:
+            msnInfo = {
+                "onStart": self._onStart,
+                "onReady": self._onReady,
+                "onGet": self._onGet,
+                "onEnd": self._onEnd,
+                "argd": argd,
+            }
+            msnList = [{"path": x} for x in paths]
+            self.msnID = MissionOCR.addMissionList(msnInfo, msnList)
+            if self.msnID.startswith("[Error]"):  # 添加任务失败
+                self._onEnd(None, f"{self.msnID}\n添加任务失败。")
+            else:  # 添加成功，通知前端刷新UI
+                logger.debug(f"添加任务成功 {self.msnID}")
+            return self.msnID
+        else:
+            # 分批处理
+            self._batchProcess(paths, argd, batch_size)
+            return "[Success] Batch processing started"
+    
+    def _batchProcess(self, paths, argd, batch_size):
+        """分批处理任务"""
+        total_paths = len(paths)
+        current_batch = 0
+        
+        def _onBatchEnd(msnInfo, msg):
+            nonlocal current_batch
+            current_batch += 1
+            next_start = current_batch * batch_size
+            
+            if next_start < total_paths:
+                # 处理下一批
+                next_end = min(next_start + batch_size, total_paths)
+                next_paths = paths[next_start:next_end]
+                
+                batch_msnInfo = {
+                    "onStart": self._onStart,
+                    "onReady": self._onReady,
+                    "onGet": self._onGet,
+                    "onEnd": _onBatchEnd,
+                    "argd": argd,
+                }
+                batch_msnList = [{"path": x} for x in next_paths]
+                MissionOCR.addMissionList(batch_msnInfo, batch_msnList)
+            else:
+                # 所有批次处理完成
+                self._onEnd(msnInfo, "[Success] All batches processed")
+        
+        # 处理第一批
+        first_end = min(batch_size, total_paths)
+        first_paths = paths[:first_end]
+        
+        first_msnInfo = {
+            "onStart": self._onStart,
+            "onReady": self._onReady,
+            "onGet": self._onGet,
+            "onEnd": _onBatchEnd,
+            "argd": argd,
+        }
+        first_msnList = [{"path": x} for x in first_paths]
+        MissionOCR.addMissionList(first_msnInfo, first_msnList)
 
     def _preprocessArgd(self, argd, path0):  # 预处理参数字典，无异常返回True
         self.argd = None
