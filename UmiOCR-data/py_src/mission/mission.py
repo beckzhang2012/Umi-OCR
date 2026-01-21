@@ -54,10 +54,20 @@ class Mission:
         # 任务状态state:  waiting 等待开始， running 进行中， stop 要求停止
         msnInfo["state"] = "waiting"
         msnInfo["msnID"] = msnID
+        # 添加分批处理相关属性
+        msnInfo["totalTasks"] = len(msnList)
+        msnInfo["processedTasks"] = 0
+        # 分批处理，每批最多处理20个任务
+        batchSize = 20
+        msnInfo["batchSize"] = batchSize
+        msnInfo["originalMsnList"] = msnList  # 保存原始任务列表
+        msnInfo["currentBatch"] = 0
+        # 初始只添加第一批任务
+        currentBatchList = msnList[:batchSize]
         # 添加到任务队列
         self._msnMutex.lock()  # 上锁
         self._msnInfoDict[msnID] = msnInfo  # 添加任务信息
-        self._msnListDict[msnID] = msnList  # 添加任务队列
+        self._msnListDict[msnID] = currentBatchList  # 添加当前批次任务队列
         self._msnMutex.unlock()  # 解锁
         # 启动任务
         self._startMsns()
@@ -253,14 +263,34 @@ class Mission:
 
             # 8. 不停止，则上报该任务
             msnList.pop(0)  # 弹出该任务
+            # 更新已处理任务计数
+            if "processedTasks" in msnInfo:
+                msnInfo["processedTasks"] += 1
             self._msnMutex.unlock()  # 锁2 解锁
             # 回调。注意：回调函数执行时间长时，可能用户再次提交了任务暂停，需要后续继续判断。
             msnInfo["onGet"](msnInfo, msn, res)
 
             # 9. 这条任务队列完成
             if len(msnList) == 0:
-                msnInfo["onEnd"](msnInfo, "[Success]")
+                # 检查是否有更多任务需要处理
                 self._msnMutex.lock()  # 锁3 上锁
+                if "originalMsnList" in msnInfo:
+                    totalTasks = msnInfo["totalTasks"]
+                    processedTasks = msnInfo["processedTasks"]
+                    batchSize = msnInfo["batchSize"]
+                    currentBatch = msnInfo["currentBatch"] + 1
+                    # 计算下一批任务的起始和结束索引
+                    startIdx = currentBatch * batchSize
+                    endIdx = startIdx + batchSize
+                    if startIdx < totalTasks:
+                        # 还有更多任务，加载下一批
+                        nextBatchList = msnInfo["originalMsnList"][startIdx:endIdx]
+                        self._msnListDict[dictKey] = nextBatchList
+                        msnInfo["currentBatch"] = currentBatch
+                        self._msnMutex.unlock()  # 锁3 解锁
+                        continue
+                # 所有任务都已处理完成
+                msnInfo["onEnd"](msnInfo, "[Success]")
                 self._msnDictDel(dictKey)
                 self._msnMutex.unlock()  # 锁3 解锁
                 dictIndex -= 1  # 字典下标回退1位，下次执行正确的下一项
