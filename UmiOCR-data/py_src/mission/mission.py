@@ -254,10 +254,22 @@ class Mission:
             # 8. 不停止，则上报该任务
             msnList.pop(0)  # 弹出该任务
             self._msnMutex.unlock()  # 锁2 解锁
-            # 回调。注意：回调函数执行时间长时，可能用户再次提交了任务暂停，需要后续继续判断。
+            
+            # 9. 执行回调
             msnInfo["onGet"](msnInfo, msn, res)
+            
+            # 10. 清理任务数据，实现图片懒加载
+            # 移除任务中的图片数据，防止内存泄漏
+            if "bytes" in msn:
+                del msn["bytes"]
+            if "base64" in msn:
+                del msn["base64"]
+            
+            # 11. 清理内存
+            import gc
+            gc.collect()
 
-            # 9. 这条任务队列完成
+            # 12. 这条任务队列完成
             if len(msnList) == 0:
                 msnInfo["onEnd"](msnInfo, "[Success]")
                 self._msnMutex.lock()  # 锁3 上锁

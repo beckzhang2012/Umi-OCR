@@ -80,6 +80,10 @@ class __MissionOcrClass(Mission):
             return ""  # 更新成功 TODO: continue
 
     def msnTask(self, msnInfo, msn):  # 执行msn
+        # 检查内存使用情况
+        from ..utils.memory_monitor import memory_monitor
+        memory_monitor.check_memory_usage()
+        
         if "path" in msn:
             res = self._api.runPath(msn["path"])
             res["path"] = msn["path"]  # 结果字典中补充参数
@@ -111,6 +115,11 @@ class __MissionOcrClass(Mission):
                         res["code"] = 101
                         res["data"] = ""
                         break
+        
+        # 清理内存
+        import gc
+        gc.collect()
+        
         return res
 
     # ========================= 【qml接口】 =========================
