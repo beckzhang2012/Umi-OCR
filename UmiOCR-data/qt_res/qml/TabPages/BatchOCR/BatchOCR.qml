@@ -180,6 +180,10 @@ TabPage {
         }
         previewImage.show(info.path, data, text)
     }
+    // 内存警告处理
+    function onMemoryWarning(msg, memInfo) {
+        qmlapp.popup.simple(qsTr("内存使用警告"), msg, "warning")
+    }
 
     // ========================= 【布局】 =========================
 
