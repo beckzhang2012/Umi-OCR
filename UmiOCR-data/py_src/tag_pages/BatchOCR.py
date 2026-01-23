@@ -9,6 +9,7 @@ from umi_log import logger
 from .page import Page  # 页基类
 from ..mission.mission_ocr import MissionOCR  # 任务管理器
 from ..utils.utils import allowedFileName
+from ..utils.memory_monitor import memory_monitor
 from ..ocr.output import Output  # 输出器
 
 
@@ -18,10 +19,26 @@ class BatchOCR(Page):
         self.argd = None
         self.msnID = ""
         self.outputList = []  # 输出器列表
+        # 设置内存监控回调
+        memory_monitor.set_warning_callback(self._onMemoryWarning)
+        # 启动内存监控
+        memory_monitor.start_monitoring()
 
     # ========================= 【qml调用python】 =========================
 
     def msnPaths(self, paths, argd):  # 接收路径列表和配置参数字典，开始OCR任务
+        # 预处理参数字典
+        if not self._preprocessArgd(argd, paths[0]):
+            return ""
+        # 构造输出器
+        if not self._initOutputList(argd):
+            return ""
+        
+        # 分批处理机制
+        batch_size = 30  # 每批处理30张图片
+        total = len(paths)
+        batches = (total + batch_size - 1) // batch_size
+        
         # 任务信息
         msnInfo = {
             "onStart": self._onStart,
@@ -30,19 +47,26 @@ class BatchOCR(Page):
             "onEnd": self._onEnd,
             "argd": argd,
         }
-        # 预处理参数字典
-        if not self._preprocessArgd(argd, paths[0]):
-            return ""
-        # 构造输出器
-        if not self._initOutputList(argd):
-            return ""
-        # 路径转为任务列表格式，加载进任务管理器
-        msnList = [{"path": x} for x in paths]
-        self.msnID = MissionOCR.addMissionList(msnInfo, msnList)
-        if self.msnID.startswith("[Error]"):  # 添加任务失败
-            self._onEnd(None, f"{self.msnID}\n添加任务失败。")
-        else:  # 添加成功，通知前端刷新UI
-            logger.debug(f"添加任务成功 {self.msnID}")
+        
+        # 分批添加任务
+        batch_msnIDs = []
+        for i in range(batches):
+            start = i * batch_size
+            end = min(start + batch_size, total)
+            batch_paths = paths[start:end]
+            
+            # 路径转为任务列表格式，加载进任务管理器
+            msnList = [{"path": x} for x in batch_paths]
+            msnID = MissionOCR.addMissionList(msnInfo, msnList)
+            
+            if msnID.startswith("[Error]"):  # 添加任务失败
+                self._onEnd(None, f"{msnID}\n添加任务失败。")
+                return ""
+            else:  # 添加成功，通知前端刷新UI
+                logger.debug(f"添加任务批次 {i+1}/{batches} 成功 {msnID}")
+                batch_msnIDs.append(msnID)
+        
+        self.msnID = ",".join(batch_msnIDs)
         return self.msnID
 
     def _preprocessArgd(self, argd, path0):  # 预处理参数字典，无异常返回True
@@ -114,13 +138,19 @@ class BatchOCR(Page):
         return True
 
     def msnStop(self):  # 任务停止
-        MissionOCR.stopMissionList(self.msnID)
+        if self.msnID:
+            msnIDs = self.msnID.split(',')
+            MissionOCR.stopMissionList(msnIDs)
 
     def msnPause(self):  # 任务暂停
-        MissionOCR.pauseMissionList(self.msnID)
+        if self.msnID:
+            msnIDs = self.msnID.split(',')
+            MissionOCR.pauseMissionList(msnIDs)
 
     def msnResume(self):  # 任务恢复
-        MissionOCR.resumeMissionList(self.msnID)
+        if self.msnID:
+            msnIDs = self.msnID.split(',')
+            MissionOCR.resumeMissionList(msnIDs)
 
     def msnPreview(self, path, argd):  # 快速进行一次任务，主要用于预览
         msnInfo = {
@@ -159,10 +189,15 @@ class BatchOCR(Page):
         # 通知qml更新UI
         self.callQmlInMain("onOcrGet", msn["path"], res)  # 在主线程中调用qml
 
+    def _onMemoryWarning(self, warning_msg, mem_info):
+        """内存警告回调"""
+        # 通知前端显示内存警告
+        self.callQmlInMain("onMemoryWarning", warning_msg, mem_info)
+    
     def _onEnd(self, msnInfo, msg):  # 任务队列完成或失败
         if msnInfo:
             msnID = msnInfo["msnID"]
-            if msnID != self.msnID:
+            if msnID not in self.msnID:
                 logger.warning(f"_onEnd 任务ID未在记录。{msnID}")
                 return
         else:
@@ -173,8 +208,21 @@ class BatchOCR(Page):
                 o.onEnd()
             except Exception as e:
                 msg = f"[Error] 输出器异常：{e}" + msg
+        # 清理内存
+        self._cleanMemory()
         # msg: [Success] [Warning] [Error]
         self.callQmlInMain("onOcrEnd", msg, msnID)
+    
+    def _cleanMemory(self):
+        """清理内存"""
+        # 清理输出器列表
+        self.outputList.clear()
+        # 清理参数字典
+        self.argd = None
+        # 手动触发垃圾回收
+        import gc
+        gc.collect()
+        logger.debug("内存已清理")
 
     def _onPreview(self, msnInfo, msn, res):
         self.callQmlInMain("onPreview", msn["path"], res)
